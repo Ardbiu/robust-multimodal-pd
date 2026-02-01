@@ -1,0 +1,16 @@
+scenarios:
+  - name: "full_observation"
+    drop_modalities: []
+  - name: "no_dat"
+    drop_modalities: ["datspect"]
+  - name: "no_mri"
+    drop_modalities: ["mri"]
+  - name: "clinical_only"
+    drop_modalities: ["datspect", "mri"]
+  - name: "random_1_drop"
+    n_drop: 1
+    type: "random"
+
+metrics: ["roc_auc", "pr_auc", "balanced_accuracy", "ece"]
+calibration_plot: true
+degradation_plot: true

@@ -1,0 +1,8 @@
+model_type: "fusion_late" # or "fusion_masked" or "fusion_moddrop"
+params:
+  hidden_dims: [64, 32]
+  dropout: 0.2
+  lr: 0.001
+  batch_size: 32
+  epochs: 50
+  moddrop_rate: 0.3 # only for moddrop

@@ -1,0 +1,5 @@
+project_name: "pd-fusion-research"
+seed: 42
+output_dir: "runs"
+log_level: "INFO"
+device: "cpu"

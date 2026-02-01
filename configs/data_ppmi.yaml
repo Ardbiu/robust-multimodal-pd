@@ -1,0 +1,20 @@
+raw_data_dir: "data/raw"
+processed_data_dir: "data/processed"
+modalities:
+  clinical:
+    files: ["clinical_baseline.csv", "updrs_iii.csv"]
+    id_col: "PATNO"
+    target_col: "DIAGNOSIS"
+  datspect:
+    files: ["datspect_sbr.csv"]
+    id_col: "PATNO"
+  mri:
+    files: ["mri_volumetric.csv"]
+    id_col: "PATNO"
+
+synthetic:
+  num_samples: 500
+  clinical_dim: 10
+  datspect_dim: 5
+  mri_dim: 20
+  missing_rates: [0.1, 0.3, 0.4] 

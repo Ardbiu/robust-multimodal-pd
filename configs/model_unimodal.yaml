@@ -1,0 +1,7 @@
+model_type: "unimodal_gbdt"
+params:
+  n_estimators: 100
+  learning_rate: 0.1
+  max_depth: 5
+  random_state: 42
+modality: "clinical" # or "datspect" or "mri"

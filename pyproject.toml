@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pd-fusion"
+version = "0.1.0"
+description = "Robust Multimodal Fusion for Parkinson’s Diagnosis Under Real-World Missing-Modality Conditions (PPMI)"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "torch",
+    "lightgbm",
+    "xgboost",
+    "pyyaml",
+    "rich",
+    "matplotlib",
+    "seaborn",
+    "scipy",
+    "shap",
+]
+
+[project.scripts]
+pd-fusion = "pd_fusion.cli:main"
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
