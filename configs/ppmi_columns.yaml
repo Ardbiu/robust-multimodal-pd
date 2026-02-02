@@ -1,0 +1,67 @@
+# PPMI Column Mapping Configuration
+
+# Clinical Data (e.g., UPDRS, Demographics)
+clinical:
+  required_columns:
+    - PATNO
+    - EVENT_ID
+    - NP3TOT  # UPDRS Part III Total
+    - AGE     # From Demographics
+    - SEX     # From Demographics
+    - EDUCYRS # Education Years
+  
+  # Map raw CSV headers to internal canonical names
+  # Format: "RAW_NAME": "internal_name"
+  # If the raw name is already the internal name, you can omit it if you handle that in logic,
+  # but explicit mapping is safer.
+  column_map:
+    "PATNO": "patno"
+    "EVENT_ID": "event_id"
+    "NP3TOT": "updrs_iii"
+    "AGE_AT_BASELINE": "age" # Example adjustment
+    "GENDER": "sex"
+    "EDUCYRS": "education"
+    "MDS_UPDRS_III_Score": "updrs_iii" # Alternative name
+
+# DAT-SPECT Data
+datspect:
+  required_columns:
+    - PATNO
+    - EVENT_ID
+    - CAUDATE_R
+    - CAUDATE_L
+    - PUTAMEN_R
+    - PUTAMEN_L
+    - SBR_MEAN
+  
+  column_map:
+    "PATNO": "patno"
+    "EVENT_ID": "event_id"
+    "CAUDATE_R": "caudate_r"
+    "CAUDATE_L": "caudate_l"
+    "PUTAMEN_R": "putamen_r"
+    "PUTAMEN_L": "putamen_l"
+    "MEAN_SBR": "sbr_mean"
+
+# MRI Data (Tabular Volumetric)
+mri:
+  required_columns:
+    - PATNO
+    - EVENT_ID
+    # Add key regions of interest
+  
+  column_map:
+    "PATNO": "patno"
+    "EVENT_ID": "event_id"
+    # Mapping depends on specific FreeSurfer/other output CSVs
+    "L_Hippocampus_Vol": "hippocampus_l"
+    "R_Hippocampus_Vol": "hippocampus_r"
+
+# Target Definition
+target:
+  column: "diagnosis"
+  map:
+    "PD": 1
+    "HC": 0
+    "Parkinson's Disease": 1
+    "Healthy Control": 0

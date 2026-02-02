@@ -1,0 +1,8 @@
+model_type: "fusion_late"
+params:
+  hidden_dims: [16, 8] # Small for speed
+  dropout: 0.1
+  lr: 0.01
+  batch_size: 16
+  epochs: 5
+seed: 42

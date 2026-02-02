@@ -1,16 +1,15 @@
 import pandas as pd
 import numpy as np
 from pd_fusion.utils.metrics import compute_metrics
-from pd_fusion.data.schema import TARGET_COL, MODALITIES
+from pd_fusion.data.schema import TARGET_COL, MODALITIES, MODALITY_FEATURES
 from pd_fusion.data.missingness import apply_missingness_scenario
 from pd_fusion.data.preprocess import preprocess_features
 import torch
 
-def evaluate_model(model, df_test, mask_test, preprocess_info, config):
+def evaluate_model(model, df_test, mask_test, prep_info, config):
     results = {}
     scenarios = config.get("scenarios", [{"name": "baseline", "drop_modalities": []}])
     
-    imputer, scaler, feature_cols = preprocess_info
     y_true = df_test[TARGET_COL].values
     
     for scenario in scenarios:
@@ -18,27 +17,73 @@ def evaluate_model(model, df_test, mask_test, preprocess_info, config):
         # Apply missingness
         current_masks = apply_missingness_scenario(df_test, scenario, mask_test)
         
-        # Prepare inputs based on model expectations
-        # This is a bit complex as different models expect different inputs
-        # Here we provide a simplified version
+        # Prepare inputs
+        inputs = None
+        current_masks_tensor = None
         
-        if hasattr(model, "mod_name"): # Unimodal
-            X_test, _, _ = preprocess_features(df_test, feature_cols, imputer, scaler)
-            # Apply mask conceptually? GBDTs handle NaNs, but we can zero out if explicitly requested
-            y_prob = model.predict_proba(X_test)
-        elif "moe" in str(type(model)).lower():
+        # Determine model type by checking prep_info structure
+        # If prep_info is dict, it's MoE style (per-modality preprocessors)
+        is_moe = isinstance(prep_info, dict)
+        
+        if is_moe:
             X_dict = {}
             for mod in MODALITIES:
-                feats = [col for col in df_test.columns if col.startswith(f"{mod}_")]
-                X_mod, _, _ = preprocess_features(df_test, feats)
-                X_dict[mod] = torch.FloatTensor(X_mod)
-            m_tensor = torch.FloatTensor(np.stack([current_masks[m] for m in MODALITIES], axis=1))
-            y_prob = model.predict_proba(X_dict, m_tensor)
-        else: # Fusion
+                # Use saved preprocessors
+                if mod in prep_info:
+                    imputer, scaler, feats = prep_info[mod]
+                    # Preprocess using fitted scaler
+                    X_mod, _, _ = preprocess_features(df_test, feats, imputer, scaler)
+                    X_dict[mod] = torch.FloatTensor(X_mod)
+            inputs = X_dict
+            current_masks_tensor = torch.FloatTensor(np.stack([current_masks[m] for m in MODALITIES], axis=1))
+        else:
+            # Standard fusion
+            imputer, scaler, feature_cols = prep_info
             X_test, _, _ = preprocess_features(df_test, feature_cols, imputer, scaler)
-            y_prob = model.predict_proba(X_test)
+            inputs = X_test
+            
+        # Predict
+        if is_moe:
+            y_prob = model.predict_proba(inputs, current_masks_tensor)
+        else:
+            # Pass masks if model accepts them (e.g. MaskedFusion, ModDrop)
+            # MaskedFusion expects logic to append masks inside predict_proba if needed
+            # But wait, predict_proba signature in base is (X, masks=None)
+            # For Unimodal, masks might be ignored or used to zero out?
+            # Ideally we pass masks dict.
+            y_prob = model.predict_proba(inputs, masks=current_masks)
             
         results[name] = compute_metrics(y_true, y_prob)
         
     return results
-活跃的
+
+def compute_risk_coverage(y_true, y_prob, masks):
+    """
+    Computes Risk-Coverage curve by sweeping thresholds.
+    This simulates what the Conformal Wrapper does but for analysis.
+    For the Conformal Wrapper, we also have discrete abstain decisions.
+    """
+    # Simply, sort by confidence (max prob), then compute cum accuracy.
+    # Confidence = max(p, 1-p)
+    confidence = np.maximum(y_prob, 1-y_prob)
+    
+    # Sort descending
+    indices = np.argsort(confidence)[::-1]
+    y_sorted = y_true[indices]
+    conf_sorted = confidence[indices]
+    
+    # Correct predictions
+    # Predicted label: 1 if p>=0.5 else 0
+    preds = (y_prob >= 0.5).astype(int)
+    correct = (preds == y_true).astype(int)
+    correct_sorted = correct[indices]
+    
+    # Cumulative stats
+    n = len(y_true)
+    coverage = np.arange(1, n + 1) / n
+    # Cumulative correct
+    cum_correct = np.cumsum(correct_sorted)
+    accuracy = cum_correct / np.arange(1, n + 1)
+    risk = 1 - accuracy
+    
+    return {"coverage": coverage, "risk": risk}

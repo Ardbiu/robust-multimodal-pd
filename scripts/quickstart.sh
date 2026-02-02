@@ -7,7 +7,6 @@ echo "Running Parkinson's Multimodal Fusion Quickstart (Synthetic)..."
 export PYTHONPATH=$PYTHONPATH:$(pwd)/src
 
 # Run the full pipeline with synthetic data
-python3 -m pd_fusion.cli run --config configs/model_fusion.yaml --synthetic
+python3 -m pd_fusion.cli run --config configs/quickstart.yaml --synthetic
 
 echo "Quickstart complete. Check the 'runs/' directory for outputs."
-活跃的

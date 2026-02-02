@@ -53,4 +53,3 @@ class LateFusionModel(BaseModel):
         instance = cls(input_dim, params)
         instance.model.load_state_dict(torch.load(path))
         return instance
-活跃的

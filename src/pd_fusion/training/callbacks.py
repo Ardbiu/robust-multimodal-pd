@@ -16,4 +16,3 @@ class EarlyStopping:
         else:
             self.best_loss = val_loss
             self.counter = 0
-活跃的
