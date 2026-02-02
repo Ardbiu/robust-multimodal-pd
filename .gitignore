@@ -1,0 +1,11 @@
+# General data ignore
+data/
+runs/
+__pycache__/
+*.pyc
+*.pkl
+*.pt
+
+# Allow raw_dev (UCI/OpenNeuro small datasets)
+!data/raw_dev/
+!data/raw_dev/**
