@@ -68,7 +68,7 @@ def main():
     for model in MODELS:
         for seed in SEEDS:
             job_name = f"{model}_s{seed}"
-            output_dir = f"runs/sweep_{timestamp}/{job_name}"
+            output_dir = f"sweep_{timestamp}/{job_name}"
             
             script_content = SLURM_TEMPLATE.format(
                 job_name=job_name,

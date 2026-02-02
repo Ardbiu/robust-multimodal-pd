@@ -20,7 +20,7 @@ def plot_degradation_curve(results: dict, output_path: Path):
     save_plot_data(df, output_path.with_suffix(".csv"))
     
     plt.figure(figsize=(10, 6))
-    sns.barplot(data=df, x="Scenario", y="ROC-AUC", hue="Scenario", legend=False)
+    sns.barplot(data=df, x="Scenario", y="ROC-AUC", hue="Scenario")
     plt.title("Model Robustness: ROC-AUC vs Missingness Scenario")
     plt.ylabel("ROC-AUC")
     plt.xticks(rotation=45, ha="right")

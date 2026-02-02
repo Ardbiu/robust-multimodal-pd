@@ -1,6 +1,6 @@
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).parent.parent.parent.parent
+ROOT_DIR = Path(__file__).parent.parent.parent
 SRC_DIR = ROOT_DIR / "src" / "pd_fusion"
 DATA_DIR = ROOT_DIR / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
