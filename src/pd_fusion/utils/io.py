@@ -6,7 +6,7 @@ from typing import Any, Dict
 
 def load_yaml(path: Path) -> Dict[str, Any]:
     with open(path, "r") as f:
-        return yaml.safe_load(f)
+        return yaml.load(f, Loader=yaml.UnsafeLoader)
 
 def save_yaml(data: Dict[str, Any], path: Path):
     with open(path, "w") as f:

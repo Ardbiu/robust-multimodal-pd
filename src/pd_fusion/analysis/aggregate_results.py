@@ -16,7 +16,7 @@ def load_results(sweep_dir: Path) -> List[Dict]:
         if res_file.exists():
             try:
                 with open(res_file, "r") as f:
-                    metrics = yaml.safe_load(f)
+                    metrics = yaml.load(f, Loader=yaml.UnsafeLoader)
                 
                 # Parse run info from dir name?
                 # Format: {model}_s{seed}
