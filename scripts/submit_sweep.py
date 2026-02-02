@@ -11,6 +11,7 @@ MODELS = [
     "unimodal_datspect", 
     "unimodal_mri", 
     "fusion_late", 
+    "fusion_masked",
     "fusion_moddrop", 
     "moe"
 ]
@@ -35,12 +36,7 @@ echo "Seed: {seed}"
 
 export PYTHONPATH=$PYTHONPATH:$(pwd)/src
 
-python -m pd_fusion.cli run \\
-    --config {config_path} \\
-    --synthetic \\
-    --model {model} \\
-    --seed {seed} \\
-    --output-dir {output_dir}
+{command}
 
 echo "Job finished"
 """
@@ -49,7 +45,10 @@ def main():
     parser = argparse.ArgumentParser(description="Submit optimization sweep to SLURM")
     parser.add_argument("--dry-run", action="store_true", help="Generate scripts but do not submit")
     parser.add_argument("--partition", type=str, default="sched_mit_hill", help="SLURM partition")
-    parser.add_argument("--base-config", type=str, default="configs/model_fusion.yaml")
+    parser.add_argument("--base-config", type=str, default="configs/dev_benchmark_suite.yaml")
+    parser.add_argument("--synthetic", action="store_true", help="Use synthetic data")
+    parser.add_argument("--dataset", type=str, default="", help="Override dataset name")
+    parser.add_argument("--k-fold", type=int, default=None, help="Run K-Fold CV")
     args = parser.parse_args()
 
     # Create logs directory
@@ -69,7 +68,23 @@ def main():
         for seed in SEEDS:
             job_name = f"{model}_s{seed}"
             output_dir = f"sweep_{timestamp}/{job_name}"
-            
+            cmd_parts = [
+                "python -m pd_fusion.cli run",
+                f"--config {args.base_config}",
+            ]
+            if args.synthetic:
+                cmd_parts.append("--synthetic")
+            if args.dataset:
+                cmd_parts.append(f"--dataset {args.dataset}")
+            if args.k_fold:
+                cmd_parts.append(f"--k-fold {args.k_fold}")
+            cmd_parts.extend([
+                f"--model {model}",
+                f"--seed {seed}",
+                f"--output-dir {output_dir}",
+            ])
+            command = " \\\n+    ".join(cmd_parts)
+
             script_content = SLURM_TEMPLATE.format(
                 job_name=job_name,
                 log_dir=logs_dir.absolute(),
@@ -77,7 +92,8 @@ def main():
                 model=model,
                 seed=seed,
                 config_path=args.base_config,
-                output_dir=output_dir
+                output_dir=output_dir,
+                command=command,
             )
             
             script_path = scripts_dir / f"{job_name}.sh"

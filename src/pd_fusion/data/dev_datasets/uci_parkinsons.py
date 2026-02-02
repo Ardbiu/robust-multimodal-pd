@@ -11,8 +11,8 @@ def load_uci_parkinsons() -> Tuple[pd.DataFrame, Dict[str, np.ndarray]]:
     
     Source: data/raw_dev/uci/parkinsons.data
     """
-    from pd_fusion.paths import ROOT_DIR
-    data_path = ROOT_DIR / "data/raw_dev/uci/parkinsons.data"
+    from pd_fusion.paths import DEV_DATA_DIR
+    data_path = DEV_DATA_DIR / "uci" / "parkinsons.data"
     
     if not data_path.exists():
         raise FileNotFoundError(f"UCI Parkinsons data not found at {data_path}. Run 'python -m pd_fusion.cli download-dev' first.")

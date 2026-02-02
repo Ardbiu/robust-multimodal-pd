@@ -55,3 +55,20 @@ The codebase evaluates robustness against:
   - `models/`: PyTorch and Sklearn model implementations.
   - `experiments/`: Main pipeline orchestration.
 - `runs/`: Experiment artifacts (plots, metrics, checkpoints).
+
+## Dev Benchmark Datasets (Open Access)
+Supported dev datasets (no credentials required):
+- UCI Parkinson’s (classification)
+- UCI Telemonitoring (binary severity proxy)
+- OpenNeuro: ds004471, ds004392, ds001907 (metadata + MRI file-count proxies)
+
+Download dev datasets:
+```bash
+python -m pd_fusion.cli download-dev --dataset all
+```
+For metadata-only OpenNeuro downloads:
+```bash
+python -m pd_fusion.cli download-dev --dataset openneuro --openneuro-metadata-only
+```
+If label columns differ, update `configs/openneuro_labels.yaml`.
+Override dev data location with `PD_FUSION_DEV_DATA_DIR` (e.g., for shared storage).

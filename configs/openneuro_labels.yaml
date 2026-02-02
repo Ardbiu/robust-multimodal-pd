@@ -1,0 +1,34 @@
+# OpenNeuro label mapping hints.
+# Update label_column or label_map if dataset uses different fields/values.
+ds004471:
+  label_column_candidates: ["group", "diagnosis", "dx", "phenotype", "status"]
+  label_map:
+    "PD": 1
+    "Parkinson": 1
+    "Parkinson's": 1
+    "Patient": 1
+    "HC": 0
+    "Control": 0
+    "Healthy": 0
+
+ds004392:
+  label_column_candidates: ["group", "diagnosis", "dx", "phenotype", "status"]
+  label_map:
+    "PD": 1
+    "Parkinson": 1
+    "Parkinson's": 1
+    "Patient": 1
+    "HC": 0
+    "Control": 0
+    "Healthy": 0
+
+ds001907:
+  label_column_candidates: ["group", "diagnosis", "dx", "phenotype", "status"]
+  label_map:
+    "PD": 1
+    "Parkinson": 1
+    "Parkinson's": 1
+    "Patient": 1
+    "HC": 0
+    "Control": 0
+    "Healthy": 0

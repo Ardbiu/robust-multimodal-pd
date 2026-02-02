@@ -10,6 +10,9 @@ scenarios:
   - name: "random_1_drop"
     n_drop: 1
     type: "random"
+  - name: "random_2_drop"
+    n_drop: 2
+    type: "random"
 
 metrics: ["roc_auc", "pr_auc", "balanced_accuracy", "ece"]
 calibration_plot: true

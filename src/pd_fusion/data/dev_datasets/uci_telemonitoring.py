@@ -12,8 +12,8 @@ def load_uci_telemonitoring() -> Tuple[pd.DataFrame, Dict[str, np.ndarray]]:
     
     Source: data/raw_dev/uci/parkinsons_updrs.data
     """
-    from pd_fusion.paths import ROOT_DIR
-    data_path = ROOT_DIR / "data/raw_dev/uci/parkinsons_updrs.data"
+    from pd_fusion.paths import DEV_DATA_DIR
+    data_path = DEV_DATA_DIR / "uci" / "parkinsons_updrs.data"
     
     if not data_path.exists():
         raise FileNotFoundError(f"UCI Telemonitoring data not found at {data_path}. Run 'python -m pd_fusion.cli download-dev' first.")
@@ -25,11 +25,14 @@ def load_uci_telemonitoring() -> Tuple[pd.DataFrame, Dict[str, np.ndarray]]:
     # 1. Standardize ID
     df = df.rename(columns={"subject#": ID_COL})
     
-    # 2. Target? 
-    # This is a regression dataset. We mapped TARGET_COL typically to 'status' or 'diagnosis'.
-    # Here we might map total_UPDRS as target if running regression.
-    # For compatibility with classification pipeline, we might set TARGET_COL to 1 (all PD).
-    df[TARGET_COL] = 1 
+    # 2. Target
+    # This dataset is PD-only; create a binary severity proxy for classification.
+    # Use total_UPDRS if available; otherwise motor_UPDRS.
+    severity_col = "total_UPDRS" if "total_UPDRS" in df.columns else "motor_UPDRS"
+    if severity_col not in df.columns:
+        raise ValueError("Telemonitoring dataset missing UPDRS columns for severity proxy.")
+    median_val = df[severity_col].median()
+    df[TARGET_COL] = (df[severity_col] >= median_val).astype(int)
     
     # 3. Prefix features
     modality = "clinical"

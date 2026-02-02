@@ -24,7 +24,7 @@ def check_openneuro_cli():
         return False
     return True
 
-def download_dataset(accession: str, dest_dir: Path):
+def download_dataset(accession: str, dest_dir: Path, metadata_only: bool = False):
     if (dest_dir / accession).exists():
          logger.info(f"Dataset {accession} seems to exist at {dest_dir / accession}. Skipping.")
          return
@@ -34,6 +34,9 @@ def download_dataset(accession: str, dest_dir: Path):
         # openneuro download <accession> <output_dir>
         # Note: openneuro cli usually creates the dir.
         cmd = ["openneuro", "download", accession, str(dest_dir / accession)]
+        if metadata_only:
+            # Attempt to download metadata/tabular files only
+            cmd += ["--include", "participants.tsv", "--include", "participants.json", "--include", "dataset_description.json"]
         subprocess.run(cmd, check=True)
         logger.info(f"Successfully downloaded {accession}.")
     except subprocess.CalledProcessError as e:
@@ -41,7 +44,7 @@ def download_dataset(accession: str, dest_dir: Path):
     except Exception as e:
         logger.error(f"Unexpected error downloading {accession}: {e}")
 
-def download_openneuro_datasets(base_dir: Path):
+def download_openneuro_datasets(base_dir: Path, metadata_only: bool = False):
     if not check_openneuro_cli():
         return
 
@@ -49,4 +52,4 @@ def download_openneuro_datasets(base_dir: Path):
     neuro_dir.mkdir(parents=True, exist_ok=True)
 
     for name, acc in OPENNEURO_DATASETS.items():
-        download_dataset(acc, neuro_dir)
+        download_dataset(acc, neuro_dir, metadata_only=metadata_only)

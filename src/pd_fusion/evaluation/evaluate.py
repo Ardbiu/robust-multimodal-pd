@@ -4,6 +4,7 @@ from pd_fusion.utils.metrics import compute_metrics
 from pd_fusion.data.schema import TARGET_COL, MODALITIES, MODALITY_FEATURES
 from pd_fusion.data.missingness import apply_missingness_scenario
 from pd_fusion.data.preprocess import preprocess_features
+from pd_fusion.data.missingness import get_modality_mask_matrix
 import torch
 
 def evaluate_model(model, df_test, mask_test, prep_info, config):
@@ -27,15 +28,14 @@ def evaluate_model(model, df_test, mask_test, prep_info, config):
         
         if is_moe:
             X_dict = {}
-            for mod in MODALITIES:
-                # Use saved preprocessors
-                if mod in prep_info:
-                    imputer, scaler, feats = prep_info[mod]
-                    # Preprocess using fitted scaler
-                    X_mod, _, _ = preprocess_features(df_test, feats, imputer, scaler)
-                    X_dict[mod] = torch.FloatTensor(X_mod)
+            mods_used = list(prep_info.keys())
+            for mod in mods_used:
+                imputer, scaler, feats = prep_info[mod]
+                # Preprocess using fitted scaler
+                X_mod, _, _ = preprocess_features(df_test, feats, imputer, scaler)
+                X_dict[mod] = torch.FloatTensor(X_mod)
             inputs = X_dict
-            current_masks_tensor = torch.FloatTensor(np.stack([current_masks[m] for m in MODALITIES], axis=1))
+            current_masks_tensor = torch.FloatTensor(np.stack([current_masks[m] for m in mods_used], axis=1))
         else:
             # Standard fusion
             imputer, scaler, feature_cols = prep_info
@@ -51,7 +51,11 @@ def evaluate_model(model, df_test, mask_test, prep_info, config):
             # But wait, predict_proba signature in base is (X, masks=None)
             # For Unimodal, masks might be ignored or used to zero out?
             # Ideally we pass masks dict.
-            y_prob = model.predict_proba(inputs, masks=current_masks)
+            if hasattr(model, "mask_dim"):
+                mask_mat = get_modality_mask_matrix(current_masks)
+                y_prob = model.predict_proba(inputs, masks=mask_mat)
+            else:
+                y_prob = model.predict_proba(inputs, masks=current_masks)
             
         results[name] = compute_metrics(y_true, y_prob)
         

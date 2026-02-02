@@ -25,6 +25,7 @@ def main():
     parser = argparse.ArgumentParser(description="Download Development Datasets")
     parser.add_argument("--out", type=str, default="data/raw_dev", help="Output directory")
     parser.add_argument("--dataset", type=str, default="all", choices=["all", "uci", "openneuro", "manual"])
+    parser.add_argument("--openneuro-metadata-only", action="store_true", help="Download OpenNeuro metadata only")
     args = parser.parse_args()
     
     out_dir = Path(args.out)
@@ -38,7 +39,7 @@ def main():
         
     if args.dataset in ["all", "openneuro"]:
         logger.info("--- Processing OpenNeuro Datasets ---")
-        download_openneuro_datasets(out_dir)
+        download_openneuro_datasets(out_dir, metadata_only=args.openneuro_metadata_only)
         
     if args.dataset in ["all", "manual"]:
         print_manual_instructions()

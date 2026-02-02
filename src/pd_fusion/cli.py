@@ -1,5 +1,6 @@
 import argparse
 import logging
+from pathlib import Path
 from pd_fusion.utils.logging import setup_logging
 from pd_fusion.utils.io import load_yaml
 from pd_fusion.paths import CONFIGS_DIR
@@ -33,17 +34,23 @@ def main():
     full_parser.add_argument("--seed", type=int, help="Override random seed")
     full_parser.add_argument("--output-dir", type=str, help="Override output directory name")
     full_parser.add_argument("--k-fold", type=int, help="Run K-Fold CV (e.g. 5)")
+    full_parser.add_argument("--dataset", type=str, help="Override dataset name (e.g., uci_parkinsons, openneuro_ds004471)")
 
 
     # Dev Datasets
     download_parser = subparsers.add_parser("download-dev")
     download_parser.add_argument("--dataset", type=str, default="all")
     download_parser.add_argument("--out", type=str, default="data/raw_dev")
+    download_parser.add_argument("--openneuro-metadata-only", action="store_true")
     
     prepare_parser = subparsers.add_parser("prepare-dev")
     
     args = parser.parse_args()
     setup_logging()
+    # Capture command for provenance
+    import os as _os
+    import sys as _sys
+    _os.environ["PD_FUSION_COMMAND"] = "python -m pd_fusion.cli " + " ".join(_sys.argv[1:])
     
     if args.command == "download-dev":
         from pd_fusion.data.download.download_manager import main as download_main
@@ -59,7 +66,7 @@ def main():
         if args.dataset in ["all", "uci"]:
             download_uci_datasets(out_dir)
         if args.dataset in ["all", "openneuro"]:
-            download_openneuro_datasets(out_dir)
+            download_openneuro_datasets(out_dir, metadata_only=args.openneuro_metadata_only)
         if args.dataset in ["all", "manual"]:
             print_manual_instructions()
             
@@ -73,14 +80,32 @@ def main():
     elif args.command == "run":
         # Pass overrides as dict
         overrides = {}
-        if args.model: overrides["model_type"] = args.model
+        if args.model:
+            if args.model.startswith("unimodal_") and args.model != "unimodal_gbdt":
+                overrides["model_type"] = "unimodal_gbdt"
+                overrides["modality"] = args.model.replace("unimodal_", "")
+            else:
+                overrides["model_type"] = args.model
         if args.seed is not None: overrides["seed"] = args.seed
         if args.output_dir: overrides["output_dir"] = args.output_dir
+        if args.dataset: overrides["dataset"] = args.dataset
         
+        # Check config-driven CV if no CLI override
+        config_k = None
+        if args.k_fold is None:
+            try:
+                conf = load_yaml(Path(args.config))
+                config_k = conf.get("cv_folds") or conf.get("k_folds")
+            except Exception:
+                config_k = None
+
         if args.k_fold is not None:
             # Run CV
             from pd_fusion.experiments.run_experiment import run_cv_pipeline
             run_cv_pipeline(args.config, k=args.k_fold, synthetic=args.synthetic, overrides=overrides)
+        elif config_k is not None:
+            from pd_fusion.experiments.run_experiment import run_cv_pipeline
+            run_cv_pipeline(args.config, k=int(config_k), synthetic=args.synthetic, overrides=overrides)
         else:
             # Run Single Split
             run_full_pipeline(args.config, args.synthetic, overrides=overrides)

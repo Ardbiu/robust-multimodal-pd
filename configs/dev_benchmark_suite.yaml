@@ -1,0 +1,21 @@
+experiment_name: "dev_benchmark_suite"
+dataset: "uci_parkinsons"
+model_type: "fusion_moddrop"
+
+params:
+  hidden_dims: [64, 32]
+  dropout: 0.3
+  lr: 0.001
+  batch_size: 32
+  epochs: 20
+  moddrop_rate: 0.3
+
+calibrate: false
+risk_coverage: true
+conformal: false
+cv_folds: 5
+cv_plot_example: true
+eval_config: "configs/eval_missingness.yaml"
+
+# Overrides for reproducibility
+seed: 42
