@@ -33,9 +33,7 @@ def main():
     full_parser.add_argument("--seed", type=int, help="Override random seed")
     full_parser.add_argument("--output-dir", type=str, help="Override output directory name")
 
-    args = parser.parse_args()
-    setup_logging()
-    
+
     # Dev Datasets
     download_parser = subparsers.add_parser("download-dev")
     download_parser.add_argument("--dataset", type=str, default="all")

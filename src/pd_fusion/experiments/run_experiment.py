@@ -47,8 +47,23 @@ def run_full_pipeline(config_path: str, synthetic: bool = False, overrides: dict
         logger.info(f"Overrides: {overrides}")
     
     # 1. Load Data
-    # For synthetic, we use synth params from data_config (or override?)
-    df, masks = load_ppmi_data(data_config, synthetic=synthetic)
+    # Support for Dev Datasets
+    dataset_name = config.get("dataset", "ppmi")
+    logger.info(f"Loading dataset: {dataset_name}")
+    
+    if dataset_name == "uci_parkinsons":
+        from pd_fusion.data.dev_datasets.uci_parkinsons import load_uci_parkinsons
+        df, masks = load_uci_parkinsons()
+        
+    elif dataset_name == "uci_telemonitoring":
+         from pd_fusion.data.dev_datasets.uci_telemonitoring import load_uci_telemonitoring
+         df, masks = load_uci_telemonitoring()
+         
+    elif dataset_name == "ppmi":
+        df, masks = load_ppmi_data(data_config, synthetic=synthetic)
+        
+    else:
+        raise ValueError(f"Unknown dataset: {dataset_name}")
     
     # 2. Split
     train_df, val_df, test_df = stratified_split(df)

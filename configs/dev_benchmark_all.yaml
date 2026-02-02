@@ -1,0 +1,19 @@
+experiment_name: "dev_benchmark_uci"
+dataset: "uci_parkinsons"
+model_type: "fusion_moddrop"
+
+# Fusion ModDrop params
+params:
+  hidden_dims: [64]
+  dropout: 0.3
+  fusion_dim: 32
+  num_classes: 2
+  lr: 0.001
+  epochs: 5
+  
+calibrate: true
+data_config: "configs/data_ppmi.yaml" # Not used for UCI but kept for compat
+eval_config: "configs/eval_missingness.yaml"
+
+# Overrides for reproducibility
+seed: 42
