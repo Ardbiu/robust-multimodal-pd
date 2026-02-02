@@ -77,10 +77,10 @@ def main():
         if args.seed is not None: overrides["seed"] = args.seed
         if args.output_dir: overrides["output_dir"] = args.output_dir
         
-        if args.kfold is not None:
+        if args.k_fold is not None:
             # Run CV
             from pd_fusion.experiments.run_experiment import run_cv_pipeline
-            run_cv_pipeline(args.config, k=args.kfold, synthetic=args.synthetic, overrides=overrides)
+            run_cv_pipeline(args.config, k=args.k_fold, synthetic=args.synthetic, overrides=overrides)
         else:
             # Run Single Split
             run_full_pipeline(args.config, args.synthetic, overrides=overrides)
