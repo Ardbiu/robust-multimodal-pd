@@ -2,6 +2,7 @@ import logging
 import datetime
 from pathlib import Path
 import pandas as pd
+import numpy as np
 from pd_fusion.utils.io import load_yaml, save_yaml, save_pickle
 from pd_fusion.utils.seed import set_seed
 from pd_fusion.paths import RUNS_DIR, get_run_dir
@@ -200,3 +201,99 @@ def run_full_pipeline(config_path: str, synthetic: bool = False, overrides: dict
     plot_risk_coverage(rc_metrics, run_dir / "risk_coverage.png")
     
     logger.info(f"Experiment finished. Results saved in {run_dir}")
+
+def run_cv_pipeline(config_path: str, k: int = 5, synthetic: bool = False, overrides: dict = None):
+    logger = logging.getLogger("pd_fusion")
+    config = load_yaml(Path(config_path))
+    if overrides: config.update(overrides)
+    
+    data_config_path = config.get("data_config", "configs/data_ppmi.yaml")
+    data_config = load_yaml(Path(data_config_path))
+    set_seed(config.get("seed", 42))
+
+    # 1. Load Data
+    dataset_name = config.get("dataset", "ppmi")
+    logger.info(f"Loading dataset: {dataset_name}")
+    if dataset_name == "uci_parkinsons":
+        from pd_fusion.data.dev_datasets.uci_parkinsons import load_uci_parkinsons
+        df, masks = load_uci_parkinsons()
+    elif dataset_name == "uci_telemonitoring":
+         from pd_fusion.data.dev_datasets.uci_telemonitoring import load_uci_telemonitoring
+         df, masks = load_uci_telemonitoring()
+    elif dataset_name == "ppmi":
+        df, masks = load_ppmi_data(data_config, synthetic=synthetic)
+    else:
+        raise ValueError(f"Unknown dataset: {dataset_name}")
+
+    # Output Dir
+    if overrides and "output_dir" in overrides:
+        run_id = overrides["output_dir"]
+    else:
+        run_id = f"cv_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    run_dir = get_run_dir(run_id)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Starting {k}-Fold CV: {run_id}")
+
+    # 2. CV Loop
+    from pd_fusion.data.splits import get_kfold_splits, get_subset_masks
+    metrics_all = []
+    
+    folds = get_kfold_splits(df, n_splits=k, seed=config.get("seed", 42))
+    
+    for i, (train_df, val_df) in enumerate(folds):
+        logger.info(f"--- Fold {i+1}/{k} ---")
+        
+        train_masks = get_subset_masks(masks, train_df.index)
+        val_masks = get_subset_masks(masks, val_df.index)
+        
+        # Train
+        model, prep_info = train_pipeline(config, train_df, val_df, train_masks, val_masks)
+        
+        # Evaluate
+        # Note: In CV, the validation set of the fold IS the test set for that fold.
+        eval_config_path = config.get("eval_config", "configs/eval_missingness.yaml")
+        eval_config = load_yaml(Path(eval_config_path))
+        results = evaluate_model(model, val_df, val_masks, prep_info, eval_config)
+        
+        # Tag results with fold
+        results["fold"] = i + 1
+        metrics_all.append(results)
+        
+        # Save fold metrics
+        save_yaml(results, run_dir / f"results_fold_{i+1}.yaml")
+        
+        # Save fold model (optional, skipping to save space unless requested)
+        # model.save(run_dir / f"model_fold_{i+1}.pt")
+
+    # 3. Aggregate
+    logger.info("Aggregating results...")
+    
+    aggregated = {}
+    summary_rows = []
+    
+    if metrics_all:
+        scenarios = [k for k in metrics_all[0].keys() if k != "fold"]
+        
+        for scen in scenarios:
+            aggregated[scen] = {}
+            metric_names = metrics_all[0][scen].keys()
+            
+            for m in metric_names:
+                values = [fold_res[scen][m] for fold_res in metrics_all]
+                mean_val = float(np.mean(values))
+                std_val = float(np.std(values))
+                aggregated[scen][m] = {"mean": mean_val, "std": std_val}
+                
+                summary_rows.append({
+                    "scenario": scen,
+                    "metric": m,
+                    "mean": mean_val,
+                    "std": std_val
+                })
+            
+    # Save Aggregated
+    save_yaml(aggregated, run_dir / "results_aggregated.yaml")
+    pd.DataFrame(summary_rows).to_csv(run_dir / "summary_table.csv", index=False)
+    
+    logger.info(f"CV Finished. Summary saved to {run_dir}")
+    return aggregated

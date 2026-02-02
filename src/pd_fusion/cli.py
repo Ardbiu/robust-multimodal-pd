@@ -32,6 +32,7 @@ def main():
     full_parser.add_argument("--model", type=str, help="Override model type")
     full_parser.add_argument("--seed", type=int, help="Override random seed")
     full_parser.add_argument("--output-dir", type=str, help="Override output directory name")
+    full_parser.add_argument("--k-fold", type=int, help="Run K-Fold CV (e.g. 5)")
 
 
     # Dev Datasets
@@ -76,7 +77,13 @@ def main():
         if args.seed is not None: overrides["seed"] = args.seed
         if args.output_dir: overrides["output_dir"] = args.output_dir
         
-        run_full_pipeline(args.config, args.synthetic, overrides=overrides)
+        if args.kfold is not None:
+            # Run CV
+            from pd_fusion.experiments.run_experiment import run_cv_pipeline
+            run_cv_pipeline(args.config, k=args.kfold, synthetic=args.synthetic, overrides=overrides)
+        else:
+            # Run Single Split
+            run_full_pipeline(args.config, args.synthetic, overrides=overrides)
     else:
         if args.command is None:
             parser.print_help()
