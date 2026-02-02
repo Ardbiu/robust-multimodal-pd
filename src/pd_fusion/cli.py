@@ -36,7 +36,35 @@ def main():
     args = parser.parse_args()
     setup_logging()
     
-    if args.command == "validate-data":
+    # Dev Datasets
+    download_parser = subparsers.add_parser("download-dev")
+    download_parser.add_argument("--dataset", type=str, default="all")
+    download_parser.add_argument("--out", type=str, default="data/raw_dev")
+    
+    prepare_parser = subparsers.add_parser("prepare-dev")
+    
+    args = parser.parse_args()
+    setup_logging()
+    
+    if args.command == "download-dev":
+        from pd_fusion.data.download.download_manager import main as download_main
+        # Re-parse args inside logic or call directly?
+        # download_manager uses argparse too. Let's call its logic directly if refactored, 
+        # or just invoke it.
+        # Ideally download_manager.download_all(args.dataset, args.out)
+        # For this skeleton, I will execute the script module logic adapting args.
+        from pd_fusion.data.download.download_manager import download_uci_datasets, download_openneuro_datasets, print_manual_instructions
+        from pathlib import Path
+        out_dir = Path(args.out)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        if args.dataset in ["all", "uci"]:
+            download_uci_datasets(out_dir)
+        if args.dataset in ["all", "openneuro"]:
+            download_openneuro_datasets(out_dir)
+        if args.dataset in ["all", "manual"]:
+            print_manual_instructions()
+            
+    elif args.command == "validate-data":
         from pd_fusion.data.ppmi_loader import process_and_merge_data
         from pathlib import Path
         data_conf = load_yaml(Path(args.config))
@@ -52,8 +80,10 @@ def main():
         
         run_full_pipeline(args.config, args.synthetic, overrides=overrides)
     else:
-        print("Please use 'run' command for the skeleton demonstration.")
-        # Other commands would call specific parts of run_full_pipeline
+        if args.command is None:
+            parser.print_help()
+        else:
+            print("Command not implemented yet.")
 
 if __name__ == "__main__":
     main()
