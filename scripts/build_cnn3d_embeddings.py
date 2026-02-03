@@ -8,6 +8,7 @@ import pandas as pd
 import nibabel as nib
 from scipy import ndimage
 import torch
+from pd_fusion.utils.torch_utils import get_torch_device
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
@@ -117,7 +118,7 @@ def main():
     dataset = VolumeDataset(df, target_shape=tuple(args.target_shape))
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=2)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_torch_device()
     model = Simple3DAE(input_shape=tuple(args.target_shape), embedding_dim=args.embedding_dim).to(device)
     if torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)

@@ -98,7 +98,8 @@ class MilAttentionModel(BaseModel):
             shuffle=True,
         )
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        from pd_fusion.utils.torch_utils import get_torch_device
+        device = get_torch_device()
         self.model.to(device)
 
         epochs = int(self.params.get("epochs", 30))
@@ -160,7 +161,8 @@ class MilAttentionModel(BaseModel):
             mri_mask = masks["mri"]
 
         probs = []
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        from pd_fusion.utils.torch_utils import get_torch_device
+        device = get_torch_device()
         self.model.to(device)
         self.model.eval()
         with torch.no_grad():

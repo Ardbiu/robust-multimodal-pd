@@ -206,7 +206,8 @@ def build_resnet2d_embeddings(manifest_path: Path, cache_dir: Path, config: Dict
     intensity_shift = float(config.get("intensity_shift", 0.1))
     noise_std = float(config.get("noise_std", 0.01))
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    from pd_fusion.utils.torch_utils import get_torch_device
+    device = get_torch_device()
     model, emb_dim, weights = _build_resnet_backbone(backbone)
     model = model.to(device)
     model.eval()

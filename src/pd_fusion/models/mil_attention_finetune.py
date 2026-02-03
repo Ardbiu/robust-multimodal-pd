@@ -44,7 +44,8 @@ class MilAttentionFineTuneModel(BaseModel):
         attn_dim = int(self.params.get("attn_dim", 128))
         dropout = float(self.params.get("dropout", 0.2))
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        from pd_fusion.utils.torch_utils import get_torch_device
+        self.device = get_torch_device()
         pretrained = bool(self.params.get("pretrained", True))
         self.backbone, self.emb_dim, self.weights = _build_resnet_backbone(self.backbone_name, pretrained=pretrained)
         self.backbone = self.backbone.to(self.device).float()
@@ -124,6 +125,7 @@ class MilAttentionFineTuneModel(BaseModel):
         t = torch.from_numpy(slices).unsqueeze(1).float()
         t = F.interpolate(t, size=(self.input_size, self.input_size), mode="bilinear", align_corners=False)
         t = t.repeat(1, 3, 1, 1)
+        t = t.to(self.device)
         t = (t - self.mean) / self.std
         return t
 

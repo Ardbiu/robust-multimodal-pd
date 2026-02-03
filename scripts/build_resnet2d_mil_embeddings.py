@@ -15,6 +15,7 @@ from pd_fusion.data.openneuro_features import (
     _build_resnet_backbone,
     _apply_affine_2d,
 )
+from pd_fusion.utils.torch_utils import get_torch_device
 
 def hash_file(path: Path) -> str:
     h = hashlib.sha256()
@@ -93,7 +94,7 @@ def main():
 
     df = pd.read_csv(manifest_path)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_torch_device()
     model, emb_dim, weights = _build_resnet_backbone(args.backbone)
     model = model.to(device).float()
     model.eval()
