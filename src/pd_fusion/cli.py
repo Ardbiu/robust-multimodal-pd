@@ -81,9 +81,23 @@ def main():
         # Pass overrides as dict
         overrides = {}
         if args.model:
+            def _load_params(path_str: str):
+                try:
+                    conf = load_yaml(Path(path_str))
+                    return conf.get("params", {})
+                except Exception:
+                    return {}
+
             if args.model.startswith("unimodal_") and args.model != "unimodal_gbdt":
                 overrides["model_type"] = "unimodal_gbdt"
                 overrides["modality"] = args.model.replace("unimodal_", "")
+                overrides["params"] = _load_params("configs/model_unimodal.yaml")
+            elif args.model in ["fusion_late", "fusion_masked", "fusion_moddrop"]:
+                overrides["model_type"] = args.model
+                overrides["params"] = _load_params("configs/model_fusion.yaml")
+            elif args.model == "moe":
+                overrides["model_type"] = args.model
+                overrides["params"] = _load_params("configs/model_moe.yaml")
             else:
                 overrides["model_type"] = args.model
         if args.seed is not None: overrides["seed"] = args.seed
