@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import subprocess
+import os
 from pathlib import Path
 
 MODELS = [
@@ -25,14 +26,8 @@ SLURM_TEMPLATE = """#!/bin/bash
 
 set -e
 source ~/.bashrc
-if ! command -v conda >/dev/null 2>&1; then
-  if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
-    source "$HOME/miniconda3/etc/profile.d/conda.sh"
-  elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
-    source "$HOME/anaconda3/etc/profile.d/conda.sh"
-  fi
-fi
-conda activate {conda_env} || source activate {conda_env}
+{conda_setup}
+{conda_activate}
 
 export PYTHONPATH=$PYTHONPATH:$(pwd)/src
 {export_dev_dir}
@@ -62,13 +57,28 @@ def build_command(base_config, dataset, synthetic, k_fold, model, seed, output_d
     ])
     return " \\\n    ".join(parts)
 
+def resolve_conda_base(arg: str) -> str:
+    if arg:
+        return arg
+    conda_exe = os.environ.get("CONDA_EXE")
+    if conda_exe:
+        try:
+            return str(Path(conda_exe).resolve().parent.parent)
+        except Exception:
+            pass
+    conda_prefix = os.environ.get("CONDA_PREFIX")
+    if conda_prefix:
+        return conda_prefix
+    return ""
+
 def main():
     parser = argparse.ArgumentParser(description="Submit two H200 jobs with sequential model runs")
     parser.add_argument("--partition", type=str, default="mit_normal_gpu")
     parser.add_argument("--time", type=str, default="05:00:00")
     parser.add_argument("--mem", type=str, default="64G")
     parser.add_argument("--cpus", type=int, default=8)
-    parser.add_argument("--conda-env", type=str, default="pd_fusion")
+    parser.add_argument("--conda-env", type=str, default="base")
+    parser.add_argument("--conda-base", type=str, default="", help="Path to conda base (for conda.sh)")
     parser.add_argument("--base-config", type=str, default="configs/dev_benchmark_suite.yaml")
     parser.add_argument("--dataset", type=str, required=True)
     parser.add_argument("--synthetic", action="store_true")
@@ -97,6 +107,17 @@ def main():
     midpoint = (len(run_list) + 1) // 2
     chunks = [run_list[:midpoint], run_list[midpoint:]]
 
+    conda_base = resolve_conda_base(args.conda_base)
+    conda_setup = ""
+    if conda_base:
+        conda_setup = f'source "{conda_base}/etc/profile.d/conda.sh"'
+    else:
+        conda_setup = "if command -v conda >/dev/null 2>&1; then :; else echo 'conda not found'; fi"
+
+    conda_activate = ""
+    if args.conda_env and args.conda_env.lower() not in ["none", ""]:
+        conda_activate = f"conda activate {args.conda_env} || source activate {args.conda_env}"
+
     for idx, chunk in enumerate(chunks, start=1):
         job_name = f"dual_h200_{idx}"
         commands = []
@@ -123,6 +144,8 @@ def main():
             mem=args.mem,
             cpus=args.cpus,
             conda_env=args.conda_env,
+            conda_setup=conda_setup,
+            conda_activate=conda_activate,
             export_dev_dir=export_dev_dir,
             commands="\n".join(commands).strip(),
         )
