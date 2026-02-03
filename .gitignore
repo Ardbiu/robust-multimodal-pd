@@ -5,6 +5,9 @@ __pycache__/
 *.pyc
 *.pkl
 *.pt
+data/raw_openneuro/
+data/processed/openneuro_ds001907/
+!data/processed/openneuro_ds001907_manifest.csv
 
 # Allow raw_dev (UCI/OpenNeuro small datasets)
 !data/raw_dev/

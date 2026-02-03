@@ -14,10 +14,21 @@ def apply_missingness_scenario(df: pd.DataFrame, scenario: Dict, maskdict: Dict[
     if "drop_modalities" in scenario:
         for mod in scenario["drop_modalities"]:
             if mod in new_masks:
-                if np.all(new_masks[mod] == 0):
-                    scen_name = scenario.get("name", "unnamed")
-                    logger.info(f"[missingness] scenario '{scen_name}': modality '{mod}' already absent; no-op.")
-                new_masks[mod] = np.zeros_like(new_masks[mod])
+                if "drop_rate" in scenario:
+                    # Drop with probability per sample
+                    rate = float(scenario.get("drop_rate", 0.0))
+                    if rate <= 0:
+                        continue
+                    drop = np.random.rand(len(new_masks[mod])) < rate
+                    if np.all(new_masks[mod] == 0):
+                        scen_name = scenario.get("name", "unnamed")
+                        logger.info(f"[missingness] scenario '{scen_name}': modality '{mod}' already absent; no-op.")
+                    new_masks[mod][drop] = 0
+                else:
+                    if np.all(new_masks[mod] == 0):
+                        scen_name = scenario.get("name", "unnamed")
+                        logger.info(f"[missingness] scenario '{scen_name}': modality '{mod}' already absent; no-op.")
+                    new_masks[mod] = np.zeros_like(new_masks[mod])
             else:
                 scen_name = scenario.get("name", "unnamed")
                 logger.info(f"[missingness] scenario '{scen_name}': modality '{mod}' not found in masks; no-op.")

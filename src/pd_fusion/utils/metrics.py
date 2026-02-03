@@ -3,7 +3,8 @@ from sklearn.metrics import (
     roc_auc_score,
     average_precision_score,
     balanced_accuracy_score,
-    brier_score_loss
+    brier_score_loss,
+    f1_score
 )
 
 def compute_metrics(y_true, y_prob, threshold=0.5):
@@ -13,6 +14,7 @@ def compute_metrics(y_true, y_prob, threshold=0.5):
         "roc_auc": roc_auc_score(y_true, y_prob),
         "pr_auc": average_precision_score(y_true, y_prob),
         "balanced_accuracy": balanced_accuracy_score(y_true, y_pred),
+        "f1": f1_score(y_true, y_pred),
         "brier_score": brier_score_loss(y_true, y_prob),
         "ece": compute_ece(y_true, y_prob)
     }

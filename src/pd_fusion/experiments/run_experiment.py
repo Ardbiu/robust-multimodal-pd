@@ -64,6 +64,10 @@ def run_full_pipeline(config_path: str, synthetic: bool = False, overrides: dict
          from pd_fusion.data.dev_datasets.uci_telemonitoring import load_uci_telemonitoring
          df, masks = load_uci_telemonitoring()
          
+    elif dataset_name == "openneuro_ds001907":
+        from pd_fusion.data.openneuro_ds001907 import load_openneuro_ds001907
+        df, masks = load_openneuro_ds001907(data_config)
+
     elif dataset_name.startswith("openneuro_") or dataset_name in ["ds004471", "ds004392", "ds001907"]:
         from pd_fusion.data.dev_datasets.openneuro import load_openneuro_dataset
         accession = dataset_name.replace("openneuro_", "")
@@ -230,6 +234,20 @@ def _save_run_provenance(run_dir: Path, config: dict, eval_config: dict, dataset
         except Exception:
             return "unknown"
 
+    def _env_info():
+        try:
+            import torch
+            torch_ver = torch.__version__
+            cuda_ver = torch.version.cuda
+        except Exception:
+            torch_ver = "unknown"
+            cuda_ver = "unknown"
+        return {
+            "python": f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
+            "torch": torch_ver,
+            "cuda": cuda_ver,
+        }
+
     command = os.environ.get("PD_FUSION_COMMAND", "unknown")
     provenance = {
         "timestamp": datetime.datetime.now().isoformat(),
@@ -240,6 +258,7 @@ def _save_run_provenance(run_dir: Path, config: dict, eval_config: dict, dataset
         "synthetic": synthetic,
         "overrides": overrides or {},
         "scenarios": eval_config.get("scenarios", []),
+        "env": _env_info(),
     }
     save_yaml(config, run_dir / "resolved_config.yaml")
     save_yaml(eval_config, run_dir / "eval_config.yaml")
@@ -263,6 +282,9 @@ def run_cv_pipeline(config_path: str, k: int = 5, synthetic: bool = False, overr
     elif dataset_name == "uci_telemonitoring":
          from pd_fusion.data.dev_datasets.uci_telemonitoring import load_uci_telemonitoring
          df, masks = load_uci_telemonitoring()
+    elif dataset_name == "openneuro_ds001907":
+        from pd_fusion.data.openneuro_ds001907 import load_openneuro_ds001907
+        df, masks = load_openneuro_ds001907(data_config)
     elif dataset_name.startswith("openneuro_") or dataset_name in ["ds004471", "ds004392", "ds001907"]:
         from pd_fusion.data.dev_datasets.openneuro import load_openneuro_dataset
         accession = dataset_name.replace("openneuro_", "")
@@ -292,10 +314,14 @@ def run_cv_pipeline(config_path: str, k: int = 5, synthetic: bool = False, overr
     )
 
     # 2. CV Loop
-    from pd_fusion.data.splits import get_kfold_splits, get_subset_masks
+    from pd_fusion.data.splits import get_kfold_splits, get_group_kfold_splits, get_subset_masks
     metrics_all = []
     
-    folds = get_kfold_splits(df, n_splits=k, seed=config.get("seed", 42))
+    group_col = config.get("group_col") or config.get("cv_group_col")
+    if group_col:
+        folds = get_group_kfold_splits(df, n_splits=k, seed=config.get("seed", 42), group_col=group_col)
+    else:
+        folds = get_kfold_splits(df, n_splits=k, seed=config.get("seed", 42))
     
     for i, (train_df, val_df) in enumerate(folds):
         logger.info(f"--- Fold {i+1}/{k} ---")
@@ -318,6 +344,24 @@ def run_cv_pipeline(config_path: str, k: int = 5, synthetic: bool = False, overr
         
         # Save fold metrics
         save_yaml(results, run_dir / f"results_fold_{i+1}.yaml")
+
+        # Save fold predictions for full_observation
+        try:
+            from pd_fusion.evaluation.evaluate import predict_proba_for_scenario
+            scenario = {"name": "full_observation", "drop_modalities": []}
+            y_true, y_prob = predict_proba_for_scenario(model, val_df, val_masks, prep_info, scenario)
+            pred_df = pd.DataFrame({
+                "y_true": y_true,
+                "y_prob": y_prob,
+                "fold": i + 1,
+            })
+            if group_col and group_col in val_df.columns:
+                pred_df[group_col] = val_df[group_col].values
+            if "session" in val_df.columns:
+                pred_df["session"] = val_df["session"].values
+            pred_df.to_csv(run_dir / f"preds_fold_{i+1}_full_observation.csv", index=False)
+        except Exception as e:
+            logger.warning(f"Failed to save fold predictions: {e}")
         
         # Optional: plot example curves for fold 1
     if config.get("cv_plot_example", False) and i == 0:
@@ -394,4 +438,20 @@ def run_cv_pipeline(config_path: str, k: int = 5, synthetic: bool = False, overr
     summary_df.to_latex(run_dir / "summary_table.tex", index=False, float_format="%.4f")
     
     logger.info(f"CV Finished. Summary saved to {run_dir}")
+
+    # Optional session shift evaluation
+    if config.get("session_shift", False):
+        session_col = config.get("session_col", "session")
+        if session_col in df.columns:
+            logger.info("Running session-shift evaluation...")
+            for train_ses, test_ses in [(1, 2), (2, 1)]:
+                train_df = df[df[session_col] == train_ses]
+                val_df = df[df[session_col] == test_ses]
+                train_masks = get_subset_masks(masks, train_df.index)
+                val_masks = get_subset_masks(masks, val_df.index)
+                model, prep_info = train_pipeline(config, train_df, val_df, train_masks, val_masks)
+                results = evaluate_model(model, val_df, val_masks, prep_info, eval_config)
+                save_yaml(results, run_dir / f"session_shift_ses{train_ses}_to_{test_ses}.yaml")
+        else:
+            logger.warning(f"session_shift requested but session_col '{session_col}' not found.")
     return aggregated

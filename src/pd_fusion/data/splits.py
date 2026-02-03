@@ -1,7 +1,13 @@
-from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.model_selection import train_test_split, StratifiedKFold, GroupKFold
 import pandas as pd
 from typing import Tuple, Dict, Generator
 from pd_fusion.data.schema import TARGET_COL
+
+try:
+    from sklearn.model_selection import StratifiedGroupKFold
+    _HAS_SGK = True
+except Exception:
+    _HAS_SGK = False
 
 def stratified_split(df: pd.DataFrame, test_size: float = 0.2, val_size: float = 0.1, seed: int = 42):
     """
@@ -30,6 +36,28 @@ def get_kfold_splits(df: pd.DataFrame, n_splits: int = 5, seed: int = 42) -> Gen
     
     for train_idx, val_idx in skf.split(df, y):
         yield df.iloc[train_idx], df.iloc[val_idx]
+
+def get_group_kfold_splits(
+    df: pd.DataFrame,
+    n_splits: int = 5,
+    seed: int = 42,
+    group_col: str = "subject_id",
+) -> Generator[Tuple[pd.DataFrame, pd.DataFrame], None, None]:
+    """
+    Yields (train_df, val_df) for GroupKFold CV.
+    Uses StratifiedGroupKFold if available.
+    """
+    y = df[TARGET_COL]
+    groups = df[group_col]
+
+    if _HAS_SGK:
+        splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=seed)
+        for train_idx, val_idx in splitter.split(df, y, groups):
+            yield df.iloc[train_idx], df.iloc[val_idx]
+    else:
+        splitter = GroupKFold(n_splits=n_splits)
+        for train_idx, val_idx in splitter.split(df, y, groups):
+            yield df.iloc[train_idx], df.iloc[val_idx]
 
 def get_subset_masks(maskdict: Dict, indices: pd.Index):
     # Maskdict arrays are aligned with original df indices if RangeIndex(0..N)

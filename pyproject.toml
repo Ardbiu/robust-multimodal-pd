@@ -13,6 +13,8 @@ dependencies = [
     "pandas",
     "scikit-learn",
     "torch",
+    "nibabel",
+    "tqdm",
     "lightgbm",
     "xgboost",
     "pyyaml",

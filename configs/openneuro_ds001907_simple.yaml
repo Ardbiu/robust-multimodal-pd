@@ -1,0 +1,22 @@
+experiment_name: "openneuro_ds001907_simple"
+dataset: "openneuro_ds001907"
+data_config: "configs/data_openneuro_ds001907.yaml"
+eval_config: "configs/eval_missingness_openneuro_ds001907.yaml"
+
+model_type: "fusion_moddrop"
+params:
+  hidden_dims: [128, 64]
+  dropout: 0.3
+  lr: 0.001
+  batch_size: 32
+  epochs: 30
+  moddrop_rate: 0.3
+
+calibrate: true
+risk_coverage: true
+cv_folds: 5
+cv_plot_example: true
+group_col: "subject_id"
+session_col: "session"
+session_shift: false
+seed: 42

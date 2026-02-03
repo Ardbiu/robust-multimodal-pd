@@ -1,0 +1,24 @@
+scenarios:
+  - name: "full_observation"
+    drop_modalities: []
+  - name: "mri_missing_25"
+    drop_modalities: ["mri"]
+    drop_rate: 0.25
+  - name: "mri_missing_50"
+    drop_modalities: ["mri"]
+    drop_rate: 0.50
+  - name: "mri_missing_75"
+    drop_modalities: ["mri"]
+    drop_rate: 0.75
+  - name: "mri_missing_100"
+    drop_modalities: ["mri"]
+  - name: "random_1_drop"
+    n_drop: 1
+    type: "random"
+  - name: "random_2_drop"
+    n_drop: 2
+    type: "random"
+
+metrics: ["roc_auc", "pr_auc", "balanced_accuracy", "f1", "ece", "brier_score"]
+calibration_plot: true
+degradation_plot: true

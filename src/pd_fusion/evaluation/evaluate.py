@@ -64,6 +64,37 @@ def evaluate_model(model, df_test, mask_test, prep_info, config):
         
     return results
 
+def predict_proba_for_scenario(model, df_test, mask_test, prep_info, scenario):
+    """
+    Returns y_true, y_prob for a single scenario.
+    """
+    current_masks = apply_missingness_scenario(df_test, scenario, mask_test)
+    y_true = df_test[TARGET_COL].values
+
+    is_moe = isinstance(prep_info, dict)
+    if is_moe:
+        X_dict = {}
+        mods_used = list(prep_info.keys())
+        for mod in mods_used:
+            imputer, scaler, feats = prep_info[mod]
+            X_mod, _, _ = preprocess_features(df_test, feats, imputer, scaler)
+            if mod in current_masks:
+                X_mod = X_mod * current_masks[mod].reshape(-1, 1)
+            X_dict[mod] = torch.FloatTensor(X_mod)
+        inputs = X_dict
+        current_masks_tensor = torch.FloatTensor(np.stack([current_masks[m] for m in mods_used], axis=1))
+        y_prob = model.predict_proba(inputs, current_masks_tensor)
+    else:
+        imputer, scaler, feature_cols = prep_info
+        X_test, _, _ = preprocess_features(df_test, feature_cols, imputer, scaler)
+        X_test = apply_masks_to_matrix(X_test, current_masks, feature_cols)
+        if hasattr(model, "mask_dim"):
+            mask_mat = get_modality_mask_matrix(current_masks)
+            y_prob = model.predict_proba(X_test, masks=mask_mat)
+        else:
+            y_prob = model.predict_proba(X_test, masks=current_masks)
+    return y_true, y_prob
+
 def compute_risk_coverage(y_true, y_prob, masks):
     """
     Computes Risk-Coverage curve by sweeping thresholds.
