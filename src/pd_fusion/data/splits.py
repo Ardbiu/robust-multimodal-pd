@@ -83,10 +83,6 @@ def split_train_calibration(
         df, test_size=calib_size, stratify=df[TARGET_COL], random_state=seed
     )
     return train_df, calib_df
-    else:
-        splitter = GroupKFold(n_splits=n_splits)
-        for train_idx, val_idx in splitter.split(df, y, groups):
-            yield df.iloc[train_idx], df.iloc[val_idx]
 
 def get_subset_masks(maskdict: Dict, indices: pd.Index):
     # Maskdict arrays are aligned with original df indices if RangeIndex(0..N)
