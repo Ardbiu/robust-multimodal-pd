@@ -32,6 +32,7 @@ class MilAttentionFineTuneModel(BaseModel):
         self.slice_batch_size = int(self.params.get("slice_batch_size", 16))
         self.bag_batch_size = int(self.params.get("batch_size", 4))
         self.tta = int(self.params.get("tta", 1))
+        self.tta_inference = int(self.params.get("tta_inference", 1))
         self.max_rotation = float(self.params.get("max_rotation_deg", 5.0))
         self.max_translation = float(self.params.get("max_translation", 0.05))
         self.intensity_scale = float(self.params.get("intensity_scale", 0.1))
@@ -39,6 +40,11 @@ class MilAttentionFineTuneModel(BaseModel):
         self.noise_std = float(self.params.get("noise_std", 0.01))
         self.missing_prob = float(self.params.get("missing_prob", 0.5))
         self.freeze_backbone_epochs = int(self.params.get("freeze_backbone_epochs", 2))
+        self.train_aug = bool(self.params.get("train_aug", True))
+        self.balanced_batches = bool(self.params.get("balanced_batches", False))
+        self.loss_type = str(self.params.get("loss_type", "bce")).lower()
+        self.focal_gamma = float(self.params.get("focal_gamma", 2.0))
+        self.focal_alpha = self.params.get("focal_alpha", None)
 
         hidden_dim = int(self.params.get("hidden_dim", 256))
         attn_dim = int(self.params.get("attn_dim", 128))
@@ -91,8 +97,6 @@ class MilAttentionFineTuneModel(BaseModel):
         return _select_slices(volume, self.slice_axis, self.slice_count)
 
     def _augment_slices(self, slices: np.ndarray, rng: np.random.Generator) -> np.ndarray:
-        if self.tta <= 1:
-            return slices
         aug = slices.copy()
         angle = rng.uniform(-self.max_rotation, self.max_rotation)
         translate = rng.uniform(-self.max_translation, self.max_translation, size=2)
@@ -115,9 +119,8 @@ class MilAttentionFineTuneModel(BaseModel):
         vol = _load_volume(bag, target_shape=self.target_shape)
         vol = _normalize_volume_for_resnet(vol)
         slices = self._select_slices_multi(vol)
-        if train and self.tta > 1:
-            rng_seed = abs(hash(str(bag))) % (2**32)
-            rng = np.random.default_rng(rng_seed)
+        if train and self.train_aug:
+            rng = np.random.default_rng()
             slices = self._augment_slices(slices, rng)
         return slices.astype(np.float32, copy=False)
 
@@ -179,15 +182,42 @@ class MilAttentionFineTuneModel(BaseModel):
             self.attn.train()
             self._set_backbone_trainable(epoch >= self.freeze_backbone_epochs)
 
-            idxs = np.random.permutation(n)
-            for start in range(0, n, self.bag_batch_size):
-                batch_idx = idxs[start:start + self.bag_batch_size]
+            if self.balanced_batches:
+                pos_idx = np.where(y >= 0.5)[0]
+                neg_idx = np.where(y < 0.5)[0]
+                if len(pos_idx) == 0 or len(neg_idx) == 0:
+                    batch_indices = np.random.permutation(n)
+                else:
+                    half = max(1, self.bag_batch_size // 2)
+                    num_batches = max(1, int(np.ceil(n / self.bag_batch_size)))
+                    batch_indices = []
+                    rng = np.random.default_rng()
+                    for _ in range(num_batches):
+                        pos_sel = rng.choice(pos_idx, size=half, replace=len(pos_idx) < half)
+                        neg_sel = rng.choice(neg_idx, size=self.bag_batch_size - half, replace=len(neg_idx) < (self.bag_batch_size - half))
+                        batch_indices.append(np.concatenate([pos_sel, neg_sel]))
+                batches = batch_indices if isinstance(batch_indices, list) else [
+                    batch_indices[i:i + self.bag_batch_size] for i in range(0, n, self.bag_batch_size)
+                ]
+            else:
+                idxs = np.random.permutation(n)
+                batches = [idxs[start:start + self.bag_batch_size] for start in range(0, n, self.bag_batch_size)]
+
+            for batch_idx in batches:
                 batch_bags = [bags[i] for i in batch_idx]
                 batch_y = torch.from_numpy(y[batch_idx]).to(self.device)
                 X, mask = self._forward_bags(batch_bags, train=True)
                 preds = self.attn(X, mask)
                 loss_vec = self.criterion(preds, batch_y)
-                if self.pos_weight is not None:
+                if self.loss_type == "focal":
+                    pt = torch.where(batch_y >= 0.5, preds, 1.0 - preds)
+                    focal = (1.0 - pt) ** self.focal_gamma
+                    if self.focal_alpha is not None:
+                        alpha = torch.where(batch_y >= 0.5, torch.tensor(float(self.focal_alpha), device=self.device), torch.tensor(1.0 - float(self.focal_alpha), device=self.device))
+                        loss = (alpha * focal * loss_vec).mean()
+                    else:
+                        loss = (focal * loss_vec).mean()
+                elif self.pos_weight is not None:
                     weights = torch.where(batch_y >= 0.5, torch.tensor(self.pos_weight, device=self.device), torch.tensor(1.0, device=self.device))
                     loss = (loss_vec * weights).mean()
                 else:
@@ -234,9 +264,17 @@ class MilAttentionFineTuneModel(BaseModel):
                 if bag is None or (mri_mask is not None and mri_mask[i] == 0):
                     probs.append(self.missing_prob)
                     continue
-                X, mask = self._forward_bags([bag], train=False)
-                pred = self.attn(X, mask).cpu().numpy().flatten()[0]
-                probs.append(float(pred))
+                if self.tta_inference > 1:
+                    preds = []
+                    for _ in range(self.tta_inference):
+                        X, mask = self._forward_bags([bag], train=True)
+                        pred = self.attn(X, mask).cpu().numpy().flatten()[0]
+                        preds.append(float(pred))
+                    probs.append(float(np.mean(preds)))
+                else:
+                    X, mask = self._forward_bags([bag], train=False)
+                    pred = self.attn(X, mask).cpu().numpy().flatten()[0]
+                    probs.append(float(pred))
         return np.array(probs)
 
     def save(self, path):
