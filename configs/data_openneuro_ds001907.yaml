@@ -11,5 +11,8 @@ feature_config:
 
 # CNN embedding config (used for cache key)
 cnn_config:
-  target_shape: [96, 96, 96]
-  embedding_dim: 128
+  target_shape: [64, 64, 64]
+  embedding_dim: 64
+  epochs: 10
+  batch_size: 8
+  lr: 0.001
