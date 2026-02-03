@@ -35,7 +35,19 @@ def evaluate_model(model, df_test, mask_test, prep_info, config):
             if "mri" in current_masks:
                 bags = [bag if m == 1 else None for bag, m in zip(bags, current_masks["mri"])]
             y_prob = model.predict_proba(bags, masks=current_masks)
-            results[name] = compute_metrics(y_true, y_prob)
+            metrics = compute_metrics(y_true, y_prob)
+            if group_col and group_col in df_test.columns:
+                df_tmp = pd.DataFrame({
+                    "group": df_test[group_col].values,
+                    "y_true": y_true,
+                    "y_prob": y_prob,
+                })
+                y_true_g = df_tmp.groupby("group")["y_true"].first().values
+                y_prob_g = df_tmp.groupby("group")["y_prob"].mean().values
+                subj_metrics = compute_metrics(y_true_g, y_prob_g)
+                for k, v in subj_metrics.items():
+                    metrics[f"subject_{k}"] = v
+            results[name] = metrics
             continue
         if is_moe:
             X_dict = {}
