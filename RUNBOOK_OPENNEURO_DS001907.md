@@ -64,6 +64,27 @@ python scripts/build_resnet2d_mil_embeddings.py \
 
 Then use `configs/openneuro_ds001907_resnet2d_mil.yaml` for runs.
 
+## ResNet2D MIL embeddings (multi-axis)
+```bash
+python scripts/build_resnet2d_mil_embeddings.py \
+  --manifest /home/adixit1/IEEE-spid/data/processed/openneuro_ds001907_manifest.csv \
+  --out-dir data/processed/openneuro_ds001907/embeddings_resnet2d \
+  --backbone resnet50 \
+  --target-shape 160 160 160 \
+  --slice-axes 0 1 2 \
+  --slice-counts 24 24 24 \
+  --input-size 224 \
+  --batch-size 8 \
+  --tta 2 \
+  --max-rotation-deg 8.0 \
+  --max-translation 0.05 \
+  --intensity-scale 0.15 \
+  --intensity-shift 0.15 \
+  --noise-std 0.02
+```
+
+Then use `configs/openneuro_ds001907_resnet2d_mil_multi.yaml` for runs.
+
 ## Nested CV + subject-level metrics
 OpenNeuro configs now enable nested calibration by default:
 `nested_calibration: true` and `calibration_split: 0.2`.

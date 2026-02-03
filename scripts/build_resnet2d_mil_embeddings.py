@@ -42,7 +42,9 @@ def main():
     parser.add_argument("--backbone", type=str, default="resnet50")
     parser.add_argument("--target-shape", type=int, nargs=3, default=[160, 160, 160])
     parser.add_argument("--slice-axis", type=int, default=2)
+    parser.add_argument("--slice-axes", type=int, nargs="+", default=None)
     parser.add_argument("--slice-count", type=int, default=48)
+    parser.add_argument("--slice-counts", type=int, nargs="+", default=None)
     parser.add_argument("--input-size", type=int, default=224)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--tta", type=int, default=1)
@@ -57,11 +59,17 @@ def main():
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    axes = args.slice_axes if args.slice_axes else [args.slice_axis]
+    if args.slice_counts:
+        if len(args.slice_counts) != len(axes):
+            raise ValueError("slice-counts must match length of slice-axes")
+        counts = args.slice_counts
+    else:
+        counts = [args.slice_count] * len(axes)
+
     cfg = {
         "backbone": args.backbone,
         "target_shape": args.target_shape,
-        "slice_axis": args.slice_axis,
-        "slice_count": args.slice_count,
         "input_size": args.input_size,
         "batch_size": args.batch_size,
         "tta": args.tta,
@@ -71,6 +79,12 @@ def main():
         "intensity_shift": args.intensity_shift,
         "noise_std": args.noise_std,
     }
+    if len(axes) == 1:
+        cfg["slice_axis"] = axes[0]
+        cfg["slice_count"] = counts[0]
+    else:
+        cfg["slice_axes"] = axes
+        cfg["slice_counts"] = counts
 
     manifest_hash = hash_file(manifest_path)
     cfg_hash = hash_config(cfg)
@@ -97,7 +111,10 @@ def main():
     for _, row in df.iterrows():
         vol = _load_volume(Path(row["t1wbrain_path"]), target_shape=tuple(args.target_shape))
         vol = _normalize_volume_for_resnet(vol)
-        slices = _select_slices(vol, args.slice_axis, args.slice_count)
+        slices_list = []
+        for axis, count in zip(axes, counts):
+            slices_list.append(_select_slices(vol, axis, count))
+        slices = np.concatenate(slices_list, axis=0)
 
         rng_seed = abs(hash(str(row.get("subject_id", "")))) % (2**32)
         rng = np.random.default_rng(rng_seed)
