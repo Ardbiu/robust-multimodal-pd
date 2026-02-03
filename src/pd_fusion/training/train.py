@@ -58,6 +58,8 @@ def train_pipeline(config, df_train, df_val, mask_train, mask_val):
 
     model = None
     prep_info = (imputer, scaler, all_features)
+    calibrate_X_val = X_val
+    calibrate_masks = None
     
     if model_type == "unimodal_gbdt":
         from pd_fusion.models.unimodal_gbdt import UnimodalGBDT
@@ -70,12 +72,14 @@ def train_pipeline(config, df_train, df_val, mask_train, mask_val):
             model = ConstantProbabilityModel()
             model.train(np.zeros((len(y_train), 1)), y_train, None)
             prep_info = (None, None, mod_features)
+            calibrate_X_val = np.zeros((len(y_val), 1))
         else:
             X_train_mod, imp, scl = preprocess_features(df_train, mod_features)
             X_val_mod, _, _ = preprocess_features(df_val, mod_features, imp, scl)
             model = UnimodalGBDT(modality, config["params"])
             model.train(X_train_mod, y_train, (X_val_mod, y_val))
             prep_info = (imp, scl, mod_features)
+            calibrate_X_val = X_val_mod
         
     elif model_type == "fusion_late":
         from pd_fusion.models.fusion_late import LateFusionModel
@@ -91,12 +95,14 @@ def train_pipeline(config, df_train, df_val, mask_train, mask_val):
         X_val_masked = np.concatenate([X_val, val_mask_mat], axis=1)
         model = MaskedFusionModel(len(all_features), train_mask_mat.shape[1], config["params"])
         model.train(X_train_masked, y_train, (X_val_masked, y_val))
+        calibrate_X_val = X_val_masked
 
     elif model_type == "fusion_moddrop":
         from pd_fusion.models.fusion_moddrop import ModalityDropoutModel
         # X is concatenated, but model needs dims
         model = ModalityDropoutModel(mod_dims, config["params"])
         model.train(X_train, y_train, (X_val, y_val))
+        calibrate_masks = mask_val
 
     elif model_type == "moe":
         from pd_fusion.models.moe import MoEModel
@@ -125,19 +131,23 @@ def train_pipeline(config, df_train, df_val, mask_train, mask_val):
         model = MoEModel(mod_dims, config["params"])
         model.train(X_train_dict, y_train, mask_train_tensor, (X_val_dict, y_val, mask_val_tensor))
         prep_info = moe_preprocessors
+        calibrate_X_val = X_val_dict
+        calibrate_masks = mask_val_tensor
 
     # Calibration
     if config.get("calibrate", False):
         from pd_fusion.models.calibrate import CalibratedModel
         cal_model = CalibratedModel(model, method="isotonic")
-        # Need to pass validation data in correct format
+        # Calibrate using validation data in the correct format for each model
         if model_type == "moe":
-            # Reconstruct dict
-            # ... (omitted for brevity, assume complex handling or simplified)
-             pass 
+            if calibrate_X_val is not None and calibrate_masks is not None:
+                cal_model.fit(calibrate_X_val, y_val, calibrate_masks)
+                model = cal_model
+            else:
+                logger.warning("Skipping calibration for MoE; missing validation inputs or masks.")
         else:
-             cal_model.fit(X_val, y_val)
-             model = cal_model
+            cal_model.fit(calibrate_X_val, y_val, calibrate_masks)
+            model = cal_model
 
     return model, prep_info
 
