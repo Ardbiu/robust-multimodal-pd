@@ -25,6 +25,7 @@ SLURM_TEMPLATE = """#!/bin/bash
 #SBATCH --cpus-per-task={cpus}
 
 set -e
+{module_loads}
 source ~/.bashrc
 {conda_setup}
 {conda_activate}
@@ -79,6 +80,7 @@ def main():
     parser.add_argument("--cpus", type=int, default=8)
     parser.add_argument("--conda-env", type=str, default="base")
     parser.add_argument("--conda-base", type=str, default="", help="Path to conda base (for conda.sh)")
+    parser.add_argument("--module", type=str, default="", help="Module(s) to load before conda, e.g. 'deprecated-modules anaconda3/2022.05-x86_64'")
     parser.add_argument("--base-config", type=str, default="configs/dev_benchmark_suite.yaml")
     parser.add_argument("--dataset", type=str, required=True)
     parser.add_argument("--synthetic", action="store_true")
@@ -108,6 +110,10 @@ def main():
     chunks = [run_list[:midpoint], run_list[midpoint:]]
 
     conda_base = resolve_conda_base(args.conda_base)
+    module_loads = ""
+    if args.module:
+        # Support multiple modules in one string
+        module_loads = f"module load {args.module}"
     conda_setup = ""
     if conda_base:
         conda_setup = f'source "{conda_base}/etc/profile.d/conda.sh"'
@@ -146,6 +152,7 @@ def main():
             conda_env=args.conda_env,
             conda_setup=conda_setup,
             conda_activate=conda_activate,
+            module_loads=module_loads,
             export_dev_dir=export_dev_dir,
             commands="\n".join(commands).strip(),
         )
