@@ -1,5 +1,5 @@
 manifest_path: "data/processed/openneuro_ds001907_manifest.csv"
-feature_mode: "simple" # or "cnn3d"
+feature_mode: "cnn3d"
 feature_cache_dir: "data/processed/openneuro_ds001907/features_simple"
 embedding_cache_dir: "data/processed/openneuro_ds001907/embeddings_cnn3d"
 
