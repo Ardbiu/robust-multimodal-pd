@@ -126,8 +126,13 @@ def main():
     # Print minimal summary table (e.g. ROC-AUC mean for 'full_observation')
     print("\n--- Summary (Full Observation ROC-AUC) ---")
     try:
-        subset = agg_df.xs("full_observation", level="Scenario")
-        print(subset[["roc_auc_mean", "roc_auc_std"]].sort_values("roc_auc_mean", ascending=False))
+        if df["_from_cv"].any():
+            sub = df[df["Scenario"] == "full_observation"]
+            sub = sub[["_from_cv", "Model", "Seed"] + [c for c in df.columns if c.endswith("roc_auc_mean") or c.endswith("roc_auc_std")]]
+            print(sub.sort_values(by=[c for c in sub.columns if "roc_auc_mean" in c][0], ascending=False).head(10))
+        else:
+            subset = agg_df.xs("full_observation", level="Scenario")
+            print(subset[["roc_auc_mean", "roc_auc_std"]].sort_values("roc_auc_mean", ascending=False))
     except Exception:
         print("Could not extract full_observation summary.")
 

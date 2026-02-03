@@ -95,6 +95,8 @@ def run_full_pipeline(config_path: str, synthetic: bool = False, overrides: dict
     # Load scenarios from eval config or use defaults
     eval_config_path = config.get("eval_config", "configs/eval_missingness.yaml")
     eval_config = load_yaml(Path(eval_config_path))
+    if config.get("group_col"):
+        eval_config["group_col"] = config.get("group_col")
 
     _save_run_provenance(
         run_dir=run_dir,
@@ -317,6 +319,8 @@ def run_cv_pipeline(config_path: str, k: int = 5, synthetic: bool = False, overr
     logger.info(f"Starting {k}-Fold CV: {run_id}")
     eval_config_path = config.get("eval_config", "configs/eval_missingness.yaml")
     eval_config = load_yaml(Path(eval_config_path))
+    if config.get("group_col"):
+        eval_config["group_col"] = config.get("group_col")
     _save_run_provenance(
         run_dir=run_dir,
         config=config,
@@ -327,7 +331,12 @@ def run_cv_pipeline(config_path: str, k: int = 5, synthetic: bool = False, overr
     )
 
     # 2. CV Loop
-    from pd_fusion.data.splits import get_kfold_splits, get_group_kfold_splits, get_subset_masks
+    from pd_fusion.data.splits import (
+        get_kfold_splits,
+        get_group_kfold_splits,
+        get_subset_masks,
+        split_train_calibration,
+    )
     from pd_fusion.data.schema import TARGET_COL
     metrics_all = []
     
@@ -354,14 +363,37 @@ def run_cv_pipeline(config_path: str, k: int = 5, synthetic: bool = False, overr
         
         train_masks = get_subset_masks(masks, train_df.index)
         val_masks = get_subset_masks(masks, val_df.index)
+
+        # Nested calibration split (optional)
+        use_nested = bool(config.get("nested_calibration", False)) and bool(config.get("calibrate", False))
+        calib_df = None
+        calib_masks = None
+        if use_nested:
+            calib_size = float(config.get("calibration_split", 0.2))
+            train_df, calib_df = split_train_calibration(
+                train_df,
+                calib_size=calib_size,
+                seed=config.get("seed", 42),
+                group_col=group_col,
+            )
+            train_masks = get_subset_masks(masks, train_df.index)
+            calib_masks = get_subset_masks(masks, calib_df.index)
         
         # Train
-        model, prep_info = train_pipeline(config, train_df, val_df, train_masks, val_masks)
+        model, prep_info = train_pipeline(
+            config,
+            train_df,
+            calib_df if use_nested else val_df,
+            train_masks,
+            calib_masks if use_nested else val_masks,
+        )
         
         # Evaluate
         # Note: In CV, the validation set of the fold IS the test set for that fold.
         eval_config_path = config.get("eval_config", "configs/eval_missingness.yaml")
         eval_config = load_yaml(Path(eval_config_path))
+        if group_col:
+            eval_config["group_col"] = group_col
         results = evaluate_model(model, val_df, val_masks, prep_info, eval_config)
         
         # Tag results with fold

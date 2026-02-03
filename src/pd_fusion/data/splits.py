@@ -54,6 +54,35 @@ def get_group_kfold_splits(
         splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=seed)
         for train_idx, val_idx in splitter.split(df, y, groups):
             yield df.iloc[train_idx], df.iloc[val_idx]
+
+def split_train_calibration(
+    df: pd.DataFrame,
+    calib_size: float = 0.2,
+    seed: int = 42,
+    group_col: str = None,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Split a training dataframe into train/calibration sets.
+    Uses group-aware split if group_col is provided.
+    """
+    if calib_size <= 0 or calib_size >= 1:
+        raise ValueError("calib_size must be between 0 and 1.")
+    if group_col and group_col in df.columns:
+        y = df[TARGET_COL]
+        groups = df[group_col]
+        n_splits = max(2, int(round(1.0 / calib_size)))
+        if _HAS_SGK:
+            splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=seed)
+            train_idx, calib_idx = next(splitter.split(df, y, groups))
+        else:
+            splitter = GroupKFold(n_splits=n_splits)
+            train_idx, calib_idx = next(splitter.split(df, y, groups))
+        return df.iloc[train_idx], df.iloc[calib_idx]
+    # Fallback to stratified split
+    train_df, calib_df = train_test_split(
+        df, test_size=calib_size, stratify=df[TARGET_COL], random_state=seed
+    )
+    return train_df, calib_df
     else:
         splitter = GroupKFold(n_splits=n_splits)
         for train_idx, val_idx in splitter.split(df, y, groups):

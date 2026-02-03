@@ -64,6 +64,19 @@ python scripts/build_resnet2d_mil_embeddings.py \
 
 Then use `configs/openneuro_ds001907_resnet2d_mil.yaml` for runs.
 
+## Nested CV + subject-level metrics
+OpenNeuro configs now enable nested calibration by default:
+`nested_calibration: true` and `calibration_split: 0.2`.
+Subject-level metrics are reported with the `subject_` prefix.
+
+## Bootstrap CIs (full_observation)
+```bash
+python -m pd_fusion.analysis.bootstrap_ci \
+  --sweep-dir runs/dual_sweep_YYYYMMDD_HHMMSS \
+  --group-col subject_id \
+  --n 1000
+```
+
 ## CNN embeddings (GPU, optional)
 ```bash
 python scripts/build_cnn3d_embeddings.py \

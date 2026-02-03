@@ -22,4 +22,6 @@ cv_plot_example: true
 group_col: "subject_id"
 session_col: "session"
 session_shift: false
+nested_calibration: true
+calibration_split: 0.2
 seed: 42
