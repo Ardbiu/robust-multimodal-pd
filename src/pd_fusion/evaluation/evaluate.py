@@ -4,6 +4,7 @@ from pd_fusion.utils.metrics import compute_metrics
 from pd_fusion.data.schema import TARGET_COL, MODALITIES, MODALITY_FEATURES
 from pd_fusion.data.missingness import apply_missingness_scenario
 from pd_fusion.data.preprocess import preprocess_features
+from pd_fusion.data.feature_utils import apply_masks_to_matrix
 from pd_fusion.data.missingness import get_modality_mask_matrix
 import torch
 
@@ -33,6 +34,8 @@ def evaluate_model(model, df_test, mask_test, prep_info, config):
                 imputer, scaler, feats = prep_info[mod]
                 # Preprocess using fitted scaler
                 X_mod, _, _ = preprocess_features(df_test, feats, imputer, scaler)
+                if mod in current_masks:
+                    X_mod = X_mod * current_masks[mod].reshape(-1, 1)
                 X_dict[mod] = torch.FloatTensor(X_mod)
             inputs = X_dict
             current_masks_tensor = torch.FloatTensor(np.stack([current_masks[m] for m in mods_used], axis=1))
@@ -40,7 +43,7 @@ def evaluate_model(model, df_test, mask_test, prep_info, config):
             # Standard fusion
             imputer, scaler, feature_cols = prep_info
             X_test, _, _ = preprocess_features(df_test, feature_cols, imputer, scaler)
-            inputs = X_test
+            inputs = apply_masks_to_matrix(X_test, current_masks, feature_cols)
             
         # Predict
         if is_moe:

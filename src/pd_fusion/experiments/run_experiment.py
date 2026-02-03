@@ -13,6 +13,7 @@ from pd_fusion.data.splits import stratified_split, get_subset_masks
 from pd_fusion.training.train import train_pipeline
 from pd_fusion.evaluation.evaluate import evaluate_model
 from pd_fusion.data.missingness import get_modality_mask_matrix
+from pd_fusion.data.feature_utils import apply_masks_to_matrix
 from pd_fusion.evaluation.plots import (
     plot_degradation_curve, 
     plot_calibration_curve_func, 
@@ -131,12 +132,15 @@ def run_full_pipeline(config_path: str, synthetic: bool = False, overrides: dict
             for mod in mods_used:
                 imp, scl, fs = p_info[mod]
                 x, _, _ = preprocess_features(df, fs, imp, scl)
+                if mod in ms:
+                    x = x * ms[mod].reshape(-1, 1)
                 X_d[mod] = torch.FloatTensor(x)
             m_t = torch.FloatTensor(np.stack([ms[mu] for mu in mods_used], axis=1))
             return m.predict_proba(X_d, m_t)
         else:
             imp, scl, fs = p_info
             x, _, _ = preprocess_features(df, fs, imp, scl)
+            x = apply_masks_to_matrix(x, ms, fs)
             if hasattr(m, "mask_dim"):
                 mask_mat = get_modality_mask_matrix(ms)
                 return m.predict_proba(x, mask_mat)
@@ -200,11 +204,20 @@ def run_full_pipeline(config_path: str, synthetic: bool = False, overrides: dict
         if isinstance(prep_info, dict):
             mods_used = list(prep_info.keys())
             mask_tensor = torch.FloatTensor(np.stack([test_masks[m] for m in mods_used], axis=1))
-            y_prob_test = model.predict_proba(test_inputs, mask_tensor)
+            # Apply masks to MoE inputs
+            masked_test_inputs = {}
+            for mod in mods_used:
+                x = test_inputs[mod]
+                if mod in test_masks:
+                    x = x * torch.FloatTensor(test_masks[mod]).unsqueeze(1)
+                masked_test_inputs[mod] = x
+            y_prob_test = model.predict_proba(masked_test_inputs, mask_tensor)
         elif hasattr(model, "mask_dim"):
-            y_prob_test = model.predict_proba(test_inputs, masks=get_modality_mask_matrix(test_masks))
+            masked = apply_masks_to_matrix(test_inputs, test_masks, prep_info[2])
+            y_prob_test = model.predict_proba(masked, masks=get_modality_mask_matrix(test_masks))
         else:
-            y_prob_test = model.predict_proba(test_inputs, masks=test_masks)
+            masked = apply_masks_to_matrix(test_inputs, test_masks, prep_info[2])
+            y_prob_test = model.predict_proba(masked, masks=test_masks)
         rc_metrics = compute_risk_coverage(test_df[TARGET_COL].values, y_prob_test, test_masks)
         plot_risk_coverage(rc_metrics, run_dir / "risk_coverage.png")
     
@@ -307,31 +320,34 @@ def run_cv_pipeline(config_path: str, k: int = 5, synthetic: bool = False, overr
         save_yaml(results, run_dir / f"results_fold_{i+1}.yaml")
         
         # Optional: plot example curves for fold 1
-        if config.get("cv_plot_example", False) and i == 0:
-            plot_degradation_curve({k: v for k, v in results.items() if k != "fold"}, run_dir / "degradation_fold1.png")
-            from pd_fusion.evaluation.plots import plot_roc_curve, plot_pr_curve, plot_calibration_curve_func, plot_risk_coverage
-            from pd_fusion.evaluation.evaluate import compute_risk_coverage, preprocess_features
-            from pd_fusion.data.schema import TARGET_COL, MODALITIES
-            import torch
-            # Helper to get predictions
-            def _get_preds(m, df, ms, p_info):
-                is_moe = isinstance(p_info, dict)
-                if is_moe:
-                    X_d = {}
-                    mods_used = list(p_info.keys())
-                    for mod in mods_used:
-                        imp, scl, fs = p_info[mod]
-                        x, _, _ = preprocess_features(df, fs, imp, scl)
-                        X_d[mod] = torch.FloatTensor(x)
-                    m_t = torch.FloatTensor(np.stack([ms[mu] for mu in mods_used], axis=1))
-                    return m.predict_proba(X_d, m_t)
-                else:
-                    imp, scl, fs = p_info
+    if config.get("cv_plot_example", False) and i == 0:
+        plot_degradation_curve({k: v for k, v in results.items() if k != "fold"}, run_dir / "degradation_fold1.png")
+        from pd_fusion.evaluation.plots import plot_roc_curve, plot_pr_curve, plot_calibration_curve_func, plot_risk_coverage
+        from pd_fusion.evaluation.evaluate import compute_risk_coverage, preprocess_features
+        from pd_fusion.data.schema import TARGET_COL, MODALITIES
+        import torch
+        # Helper to get predictions
+        def _get_preds(m, df, ms, p_info):
+            is_moe = isinstance(p_info, dict)
+            if is_moe:
+                X_d = {}
+                mods_used = list(p_info.keys())
+                for mod in mods_used:
+                    imp, scl, fs = p_info[mod]
                     x, _, _ = preprocess_features(df, fs, imp, scl)
-                    if hasattr(m, "mask_dim"):
-                        mask_mat = get_modality_mask_matrix(ms)
-                        return m.predict_proba(x, mask_mat)
-                    return m.predict_proba(x, ms)
+                    if mod in ms:
+                        x = x * ms[mod].reshape(-1, 1)
+                    X_d[mod] = torch.FloatTensor(x)
+                m_t = torch.FloatTensor(np.stack([ms[mu] for mu in mods_used], axis=1))
+                return m.predict_proba(X_d, m_t)
+            else:
+                imp, scl, fs = p_info
+                x, _, _ = preprocess_features(df, fs, imp, scl)
+                x = apply_masks_to_matrix(x, ms, fs)
+                if hasattr(m, "mask_dim"):
+                    mask_mat = get_modality_mask_matrix(ms)
+                    return m.predict_proba(x, mask_mat)
+                return m.predict_proba(x, ms)
             
             y_true = val_df[TARGET_COL].values
             y_prob = _get_preds(model, val_df, val_masks, prep_info)
