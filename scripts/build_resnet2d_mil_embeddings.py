@@ -117,8 +117,10 @@ def main():
                 if args.noise_std > 0:
                     aug_slices = aug_slices + rng.normal(0.0, args.noise_std, size=aug_slices.shape)
                 aug_slices = np.clip(aug_slices, 0.0, 1.0)
+            # Ensure float32 for torch model
+            aug_slices = aug_slices.astype(np.float32, copy=False)
 
-            slice_tensor = torch.from_numpy(aug_slices).unsqueeze(1)  # [N,1,H,W]
+            slice_tensor = torch.from_numpy(aug_slices).unsqueeze(1).float()  # [N,1,H,W]
             slice_tensor = F.interpolate(
                 slice_tensor, size=(args.input_size, args.input_size), mode="bilinear", align_corners=False
             )
