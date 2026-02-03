@@ -23,13 +23,20 @@ SLURM_TEMPLATE = """#!/bin/bash
 #SBATCH --mem={mem}
 #SBATCH --cpus-per-task={cpus}
 
+set -e
 source ~/.bashrc
+if ! command -v conda >/dev/null 2>&1; then
+  if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+    source "$HOME/miniconda3/etc/profile.d/conda.sh"
+  elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+    source "$HOME/anaconda3/etc/profile.d/conda.sh"
+  fi
+fi
 conda activate {conda_env} || source activate {conda_env}
 
 export PYTHONPATH=$PYTHONPATH:$(pwd)/src
 {export_dev_dir}
 
-set -e
 echo "Starting job {job_name}"
 
 {commands}
@@ -53,7 +60,7 @@ def build_command(base_config, dataset, synthetic, k_fold, model, seed, output_d
         f"--seed {seed}",
         f"--output-dir {output_dir}",
     ])
-    return " \\\n+    ".join(parts)
+    return " \\\n    ".join(parts)
 
 def main():
     parser = argparse.ArgumentParser(description="Submit two H200 jobs with sequential model runs")
