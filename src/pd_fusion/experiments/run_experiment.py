@@ -315,6 +315,7 @@ def run_cv_pipeline(config_path: str, k: int = 5, synthetic: bool = False, overr
 
     # 2. CV Loop
     from pd_fusion.data.splits import get_kfold_splits, get_group_kfold_splits, get_subset_masks
+    from pd_fusion.data.schema import TARGET_COL
     metrics_all = []
     
     group_col = config.get("group_col") or config.get("cv_group_col")
