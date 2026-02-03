@@ -52,7 +52,7 @@ class VolumeDataset(Dataset):
         return vol
 
 class Simple3DAE(nn.Module):
-    def __init__(self, embedding_dim=128):
+    def __init__(self, input_shape=(96, 96, 96), embedding_dim=128):
         super().__init__()
         self.encoder = nn.Sequential(
             nn.Conv3d(1, 8, 3, padding=1), nn.ReLU(),
@@ -62,8 +62,13 @@ class Simple3DAE(nn.Module):
             nn.Conv3d(16, 32, 3, padding=1), nn.ReLU(),
             nn.MaxPool3d(2),
         )
-        self.fc = nn.Linear(32 * 12 * 12 * 12, embedding_dim)
-        self.fc_dec = nn.Linear(embedding_dim, 32 * 12 * 12 * 12)
+        with torch.no_grad():
+            dummy = torch.zeros(1, 1, *input_shape)
+            z = self.encoder(dummy)
+            self._enc_shape = z.shape[1:]
+            enc_dim = int(np.prod(self._enc_shape))
+        self.fc = nn.Linear(enc_dim, embedding_dim)
+        self.fc_dec = nn.Linear(embedding_dim, enc_dim)
         self.decoder = nn.Sequential(
             nn.ConvTranspose3d(32, 16, 2, stride=2), nn.ReLU(),
             nn.ConvTranspose3d(16, 8, 2, stride=2), nn.ReLU(),
@@ -75,7 +80,7 @@ class Simple3DAE(nn.Module):
         z_flat = z.view(z.size(0), -1)
         emb = self.fc(z_flat)
         recon_flat = self.fc_dec(emb)
-        recon = recon_flat.view(z.size(0), 32, 12, 12, 12)
+        recon = recon_flat.view(z.size(0), *self._enc_shape)
         out = self.decoder(recon)
         return out, emb
 
@@ -113,7 +118,7 @@ def main():
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=2)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = Simple3DAE(embedding_dim=args.embedding_dim).to(device)
+    model = Simple3DAE(input_shape=tuple(args.target_shape), embedding_dim=args.embedding_dim).to(device)
     if torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)
     optim = torch.optim.Adam(model.parameters(), lr=args.lr)
