@@ -24,11 +24,15 @@ params:
   hidden_dim: 256
   attn_dim: 128
   dropout: 0.2
+  gated: true
+  class_weight: "balanced"
   lr: 0.0003
   lr_backbone: 0.0001
-  epochs: 20
+  epochs: 30
   weight_decay: 0.001
   freeze_backbone_epochs: 2
+  early_stopping_patience: 5
+  max_grad_norm: 1.0
   missing_prob: 0.5
 
 calibrate: true

@@ -48,7 +48,8 @@ class MilAttentionFineTuneModel(BaseModel):
         pretrained = bool(self.params.get("pretrained", True))
         self.backbone, self.emb_dim, self.weights = _build_resnet_backbone(self.backbone_name, pretrained=pretrained)
         self.backbone = self.backbone.to(self.device).float()
-        self.attn = MILAttentionNet(self.emb_dim, hidden_dim, attn_dim, dropout).to(self.device).float()
+        gated = bool(self.params.get("gated", False))
+        self.attn = MILAttentionNet(self.emb_dim, hidden_dim, attn_dim, dropout, gated=gated).to(self.device).float()
 
         if hasattr(self.weights, "meta"):
             mean_vals = self.weights.meta.get("mean", [0.5, 0.5, 0.5])
@@ -69,7 +70,12 @@ class MilAttentionFineTuneModel(BaseModel):
             ],
             weight_decay=weight_decay,
         )
-        self.criterion = nn.BCELoss()
+        self.criterion = nn.BCELoss(reduction="none")
+        self.pos_weight = None
+        if self.params.get("class_weight") == "balanced":
+            self.pos_weight = None
+        elif self.params.get("pos_weight") is not None:
+            self.pos_weight = float(self.params.get("pos_weight"))
 
     def _set_backbone_trainable(self, trainable: bool):
         for p in self.backbone.parameters():
@@ -154,6 +160,18 @@ class MilAttentionFineTuneModel(BaseModel):
         y = np.asarray(y, dtype=np.float32)
         n = len(bags)
         epochs = int(self.params.get("epochs", 20))
+        max_grad_norm = self.params.get("max_grad_norm")
+        patience = int(self.params.get("early_stopping_patience", 0))
+        best_auc = -1.0
+        best_state = None
+        bad_epochs = 0
+
+        if self.pos_weight is None and self.params.get("class_weight") == "balanced":
+            pos = float((y == 1).sum())
+            neg = float((y == 0).sum())
+            if pos > 0:
+                self.pos_weight = neg / pos
+
         for epoch in range(epochs):
             self.backbone.train()
             self.attn.train()
@@ -166,10 +184,41 @@ class MilAttentionFineTuneModel(BaseModel):
                 batch_y = torch.from_numpy(y[batch_idx]).to(self.device)
                 X, mask = self._forward_bags(batch_bags, train=True)
                 preds = self.attn(X, mask)
-                loss = self.criterion(preds, batch_y)
+                loss_vec = self.criterion(preds, batch_y)
+                if self.pos_weight is not None:
+                    weights = torch.where(batch_y >= 0.5, torch.tensor(self.pos_weight, device=self.device), torch.tensor(1.0, device=self.device))
+                    loss = (loss_vec * weights).mean()
+                else:
+                    loss = loss_vec.mean()
                 self.optimizer.zero_grad()
                 loss.backward()
+                if max_grad_norm:
+                    torch.nn.utils.clip_grad_norm_(list(self.backbone.parameters()) + list(self.attn.parameters()), float(max_grad_norm))
                 self.optimizer.step()
+
+            if val_data is not None and patience > 0:
+                from sklearn.metrics import roc_auc_score
+                X_val_bags, y_val = val_data
+                y_prob = self.predict_proba(X_val_bags)
+                try:
+                    auc = float(roc_auc_score(y_val, y_prob))
+                except Exception:
+                    auc = -1.0
+                if auc > best_auc:
+                    best_auc = auc
+                    best_state = {
+                        "backbone": self.backbone.state_dict(),
+                        "attn": self.attn.state_dict(),
+                    }
+                    bad_epochs = 0
+                else:
+                    bad_epochs += 1
+                    if bad_epochs >= patience:
+                        break
+
+        if best_state is not None:
+            self.backbone.load_state_dict(best_state["backbone"])
+            self.attn.load_state_dict(best_state["attn"])
 
     def predict_proba(self, bags, masks=None):
         mri_mask = None
