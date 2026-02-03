@@ -24,9 +24,18 @@ def evaluate_model(model, df_test, mask_test, prep_info, config):
         current_masks_tensor = None
         
         # Determine model type by checking prep_info structure
+        is_mil = isinstance(prep_info, tuple) and len(prep_info) >= 2 and prep_info[0] == "mil"
         # If prep_info is dict, it's MoE style (per-modality preprocessors)
         is_moe = isinstance(prep_info, dict)
         
+        if is_mil:
+            mil_col = prep_info[1]
+            bags = df_test[mil_col].tolist()
+            if "mri" in current_masks:
+                bags = [bag if m == 1 else None for bag, m in zip(bags, current_masks["mri"])]
+            y_prob = model.predict_proba(bags, masks=current_masks)
+            results[name] = compute_metrics(y_true, y_prob)
+            continue
         if is_moe:
             X_dict = {}
             mods_used = list(prep_info.keys())
@@ -71,7 +80,15 @@ def predict_proba_for_scenario(model, df_test, mask_test, prep_info, scenario):
     current_masks = apply_missingness_scenario(df_test, scenario, mask_test)
     y_true = df_test[TARGET_COL].values
 
+    is_mil = isinstance(prep_info, tuple) and len(prep_info) >= 2 and prep_info[0] == "mil"
     is_moe = isinstance(prep_info, dict)
+    if is_mil:
+        mil_col = prep_info[1]
+        bags = df_test[mil_col].tolist()
+        if "mri" in current_masks:
+            bags = [bag if m == 1 else None for bag, m in zip(bags, current_masks["mri"])]
+        y_prob = model.predict_proba(bags, masks=current_masks)
+        return y_true, y_prob
     if is_moe:
         X_dict = {}
         mods_used = list(prep_info.keys())

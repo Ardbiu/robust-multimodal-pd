@@ -287,3 +287,23 @@ def load_resnet2d_embeddings(manifest_path: Path, cache_dir: Path, config: Dict)
             "Run scripts/build_resnet2d_embeddings.py to generate them."
         )
     return pd.read_parquet(out_path)
+
+def load_resnet2d_mil_embeddings(manifest_path: Path, cache_dir: Path, config: Dict) -> pd.DataFrame:
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    manifest_hash = _hash_file(manifest_path)
+    cfg_hash = _hash_config(config)
+    out_path = cache_dir / f"resnet2d_mil_{manifest_hash}_{cfg_hash}.npz"
+    if not out_path.exists():
+        raise FileNotFoundError(
+            f"ResNet2D MIL embeddings not found at {out_path}. "
+            "Run scripts/build_resnet2d_mil_embeddings.py to generate them."
+        )
+    data = np.load(out_path, allow_pickle=True)
+    emb = data["embeddings"]
+    df = pd.DataFrame({
+        "subject_id": data["subject_id"],
+        "session": data["session"],
+        "label": data["label"],
+    })
+    df["mri_mil"] = list(emb)
+    return df

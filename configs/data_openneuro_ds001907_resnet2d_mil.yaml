@@ -1,0 +1,25 @@
+manifest_path: "data/processed/openneuro_ds001907_manifest.csv"
+feature_mode: "resnet2d_mil"
+feature_cache_dir: "data/processed/openneuro_ds001907/features_simple"
+embedding_cache_dir: "data/processed/openneuro_ds001907/embeddings_cnn3d"
+resnet2d_cache_dir: "data/processed/openneuro_ds001907/embeddings_resnet2d"
+
+feature_config:
+  hist_bins: 10
+  grid_size: 8
+  target_shape: [96, 96, 96]
+  extra_stats: false
+
+resnet2d_config:
+  backbone: "resnet50"
+  target_shape: [160, 160, 160]
+  slice_axis: 2
+  slice_count: 48
+  input_size: 224
+  batch_size: 16
+  tta: 1
+  max_rotation_deg: 5.0
+  max_translation: 0.05
+  intensity_scale: 0.1
+  intensity_shift: 0.1
+  noise_std: 0.01

@@ -49,6 +49,21 @@ python scripts/build_resnet2d_embeddings.py \
 
 Then use `configs/openneuro_ds001907_resnet2d.yaml` for runs.
 
+## ResNet2D MIL embeddings (attention pooling)
+```bash
+python scripts/build_resnet2d_mil_embeddings.py \
+  --manifest /home/adixit1/IEEE-spid/data/processed/openneuro_ds001907_manifest.csv \
+  --out-dir data/processed/openneuro_ds001907/embeddings_resnet2d \
+  --backbone resnet50 \
+  --target-shape 160 160 160 \
+  --slice-axis 2 \
+  --slice-count 48 \
+  --input-size 224 \
+  --batch-size 16
+```
+
+Then use `configs/openneuro_ds001907_resnet2d_mil.yaml` for runs.
+
 ## CNN embeddings (GPU, optional)
 ```bash
 python scripts/build_cnn3d_embeddings.py \

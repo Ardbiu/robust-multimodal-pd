@@ -129,7 +129,14 @@ def run_full_pipeline(config_path: str, synthetic: bool = False, overrides: dict
     
     # Helper to get preds
     def get_preds(m, df, ms, p_info):
+        is_mil = isinstance(p_info, tuple) and len(p_info) >= 2 and p_info[0] == "mil"
         is_moe = isinstance(p_info, dict)
+        if is_mil:
+            mil_col = p_info[1]
+            bags = df[mil_col].tolist()
+            if "mri" in ms:
+                bags = [bag if mri == 1 else None for bag, mri in zip(bags, ms["mri"])]
+            return m.predict_proba(bags, ms)
         if is_moe:
             X_d = {}
             mods_used = list(p_info.keys())
@@ -205,7 +212,13 @@ def run_full_pipeline(config_path: str, synthetic: bool = False, overrides: dict
         test_inputs = x
 
     if config.get("risk_coverage", True):
-        if isinstance(prep_info, dict):
+        if isinstance(prep_info, tuple) and len(prep_info) >= 2 and prep_info[0] == "mil":
+            mil_col = prep_info[1]
+            bags = test_df[mil_col].tolist()
+            if "mri" in test_masks:
+                bags = [bag if mri == 1 else None for bag, mri in zip(bags, test_masks["mri"])]
+            y_prob_test = model.predict_proba(bags, test_masks)
+        elif isinstance(prep_info, dict):
             mods_used = list(prep_info.keys())
             mask_tensor = torch.FloatTensor(np.stack([test_masks[m] for m in mods_used], axis=1))
             # Apply masks to MoE inputs
@@ -385,7 +398,14 @@ def run_cv_pipeline(config_path: str, k: int = 5, synthetic: bool = False, overr
         import torch
         # Helper to get predictions
         def _get_preds(m, df, ms, p_info):
+            is_mil = isinstance(p_info, tuple) and len(p_info) >= 2 and p_info[0] == "mil"
             is_moe = isinstance(p_info, dict)
+            if is_mil:
+                mil_col = p_info[1]
+                bags = df[mil_col].tolist()
+                if "mri" in ms:
+                    bags = [bag if mri == 1 else None for bag, mri in zip(bags, ms["mri"])]
+                return m.predict_proba(bags, ms)
             if is_moe:
                 X_d = {}
                 mods_used = list(p_info.keys())

@@ -10,6 +10,7 @@ from pd_fusion.data.openneuro_features import (
     load_simple_features,
     load_cnn_embeddings,
     load_resnet2d_embeddings,
+    load_resnet2d_mil_embeddings,
 )
 
 def _resolve_manifest_path(config: Dict) -> Path:
@@ -43,6 +44,14 @@ def load_openneuro_ds001907(config: Dict) -> Tuple[pd.DataFrame, Dict[str, np.nd
         df = load_resnet2d_embeddings(
             manifest_path, Path(resnet_cache_dir), config.get("resnet2d_config", {})
         )
+    elif feature_mode == "resnet2d_mil":
+        resnet_cache_dir = config.get(
+            "resnet2d_cache_dir",
+            "data/processed/openneuro_ds001907/embeddings_resnet2d"
+        )
+        df = load_resnet2d_mil_embeddings(
+            manifest_path, Path(resnet_cache_dir), config.get("resnet2d_config", {})
+        )
     else:
         raise ValueError(f"Unknown feature_mode: {feature_mode}")
 
@@ -52,9 +61,12 @@ def load_openneuro_ds001907(config: Dict) -> Tuple[pd.DataFrame, Dict[str, np.nd
 
     # Masks: mri present if any mri_ feature is non-null
     mri_cols = [c for c in df.columns if c.startswith("mri_")]
-    if not mri_cols:
-        raise ValueError("No mri_ feature columns found in ds001907 dataframe.")
-    mri_mask = (~df[mri_cols].isna().all(axis=1)).astype(int).values
+    if mri_cols:
+        mri_mask = (~df[mri_cols].isna().all(axis=1)).astype(int).values
+    elif "mri_mil" in df.columns:
+        mri_mask = df["mri_mil"].apply(lambda x: int(x is not None)).values
+    else:
+        raise ValueError("No mri_ feature columns or mri_mil found in ds001907 dataframe.")
 
     masks = {
         "clinical": np.zeros(len(df), dtype=int),

@@ -84,6 +84,7 @@ def main():
     parser.add_argument("--module", type=str, default="", help="Module(s) to load before conda, e.g. 'deprecated-modules anaconda3/2022.05-x86_64'")
     parser.add_argument("--base-config", type=str, default="configs/dev_benchmark_suite.yaml")
     parser.add_argument("--dataset", type=str, required=True)
+    parser.add_argument("--models", type=str, default="", help="Comma-separated list of models to run")
     parser.add_argument("--synthetic", action="store_true")
     parser.add_argument("--k-fold", type=int, default=None)
     parser.add_argument("--dev-data-dir", type=str, default="")
@@ -101,9 +102,12 @@ def main():
     scripts_dir.mkdir(exist_ok=True)
 
     # Build run list and split into 2 roughly equal chunks
+    models = MODELS
+    if args.models:
+        models = [m.strip() for m in args.models.split(",") if m.strip()]
     run_list = []
     seeds = [42, 43, 44]
-    for model in MODELS:
+    for model in models:
         for seed in seeds:
             run_list.append((model, seed))
 

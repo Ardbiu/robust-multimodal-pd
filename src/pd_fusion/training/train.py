@@ -38,6 +38,31 @@ def train_pipeline(config, df_train, df_val, mask_train, mask_val):
         if not config["params"]:
             config["params"] = {**defaults, **config["params"]}
     
+    y_train = df_train[TARGET_COL].values
+    y_val = df_val[TARGET_COL].values
+
+    if model_type == "mil_attention":
+        from pd_fusion.models.mil_attention import MilAttentionModel
+        mil_col = config.get("mil_column", "mri_mil")
+        if mil_col not in df_train.columns:
+            raise ValueError(f"MIL column '{mil_col}' not found in training data.")
+        X_train_bags = df_train[mil_col].tolist()
+        X_val_bags = df_val[mil_col].tolist()
+        if not X_train_bags:
+            raise ValueError("No MIL bags found for training.")
+        input_dim = int(X_train_bags[0].shape[1])
+        model = MilAttentionModel(input_dim, config["params"])
+        model.train(X_train_bags, y_train, (X_val_bags, y_val))
+        prep_info = ("mil", mil_col)
+        calibrate_X_val = X_val_bags
+        calibrate_masks = mask_val
+        if config.get("calibrate", False):
+            from pd_fusion.models.calibrate import CalibratedModel
+            cal_model = CalibratedModel(model, method="isotonic")
+            cal_model.fit(calibrate_X_val, y_val, calibrate_masks)
+            model = cal_model
+        return model, prep_info
+
     # Simple feature concatenation for non-MoE models
     all_features = get_all_feature_cols(df_train)
     
@@ -46,9 +71,6 @@ def train_pipeline(config, df_train, df_val, mask_train, mask_val):
 
     X_train, imputer, scaler = preprocess_features(df_train, all_features)
     X_val, _, _ = preprocess_features(df_val, all_features, imputer, scaler)
-    
-    y_train = df_train[TARGET_COL].values
-    y_val = df_val[TARGET_COL].values
 
     # Determine modality dims for advanced models
     mod_dims = {}
