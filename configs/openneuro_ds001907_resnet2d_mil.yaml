@@ -9,9 +9,13 @@ params:
   hidden_dim: 256
   attn_dim: 128
   dropout: 0.2
-  lr: 0.0003
+  gated: true
+  class_weight: "balanced"
+  lr: 0.0005
   batch_size: 16
-  epochs: 100
+  epochs: 80
+  early_stopping_patience: 8
+  max_grad_norm: 1.0
   weight_decay: 0.001
   missing_prob: 0.5
 
