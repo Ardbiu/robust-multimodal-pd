@@ -38,6 +38,10 @@ class CalibratedModel:
         if self.calibrator:
             return self.calibrator.transform(preds)
         return preds
+
+    def __getattr__(self, name):
+        # Delegate attribute access to the wrapped model (e.g., mask_dim)
+        return getattr(self.base_model, name)
         
     def save(self, path):
         # We save both base model and calibrator
