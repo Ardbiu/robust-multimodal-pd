@@ -60,7 +60,6 @@ def main():
         # Ideally download_manager.download_all(args.dataset, args.out)
         # For this skeleton, I will execute the script module logic adapting args.
         from pd_fusion.data.download.download_manager import download_uci_datasets, download_openneuro_datasets, print_manual_instructions
-        from pathlib import Path
         out_dir = Path(args.out)
         out_dir.mkdir(parents=True, exist_ok=True)
         if args.dataset in ["all", "uci"]:
@@ -72,7 +71,6 @@ def main():
             
     elif args.command == "validate-data":
         from pd_fusion.data.ppmi_loader import process_and_merge_data
-        from pathlib import Path
         data_conf = load_yaml(Path(args.config))
         col_conf = load_yaml(Path(args.columns))
         process_and_merge_data(data_conf, col_conf)
