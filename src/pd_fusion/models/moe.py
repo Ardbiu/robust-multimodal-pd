@@ -50,7 +50,11 @@ class MoEModel(BaseModel):
     def __init__(self, modality_dims, params):
         self.params = params
         self.model = MoENet(modality_dims, params)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=params["lr"])
+        self.optimizer = optim.Adam(
+            self.model.parameters(),
+            lr=params["lr"],
+            weight_decay=params.get("weight_decay", 0.0),
+        )
         self.criterion = nn.BCELoss()
         
     def train(self, X_dict, y, mask, val_data=None):

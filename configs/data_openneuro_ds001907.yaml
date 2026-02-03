@@ -8,6 +8,7 @@ feature_config:
   hist_bins: 10
   grid_size: 8
   target_shape: [96, 96, 96]
+  extra_stats: false
 
 # CNN embedding config (used for cache key)
 cnn_config:

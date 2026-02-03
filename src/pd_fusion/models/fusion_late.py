@@ -24,7 +24,11 @@ class LateFusionModel(BaseModel):
     def __init__(self, input_dim, params):
         self.params = params
         self.model = LateFusionNet(input_dim, params["hidden_dims"], params.get("dropout", 0.2))
-        self.optimizer = optim.Adam(self.model.parameters(), lr=params["lr"])
+        self.optimizer = optim.Adam(
+            self.model.parameters(),
+            lr=params["lr"],
+            weight_decay=params.get("weight_decay", 0.0),
+        )
         self.criterion = nn.BCELoss()
         
     def train(self, X, y, val_data=None):

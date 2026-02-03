@@ -80,6 +80,21 @@ def main():
     elif args.command == "run":
         # Pass overrides as dict
         overrides = {}
+        def _resolve_path(path_str: str) -> Path:
+            p = Path(path_str)
+            if p.exists():
+                return p
+            from pd_fusion.paths import ROOT_DIR
+            p2 = ROOT_DIR / p
+            return p2
+
+        def _get_unimodal_backbone(config_path: str) -> str:
+            try:
+                cfg = load_yaml(_resolve_path(config_path))
+                return str(cfg.get("unimodal_backbone", "gbdt")).lower()
+            except Exception:
+                return "gbdt"
+
         if args.model:
             def _load_params(path_str: str):
                 try:
@@ -93,9 +108,23 @@ def main():
                     return {}
 
             if args.model.startswith("unimodal_") and args.model != "unimodal_gbdt":
-                overrides["model_type"] = "unimodal_gbdt"
-                overrides["modality"] = args.model.replace("unimodal_", "")
-                overrides["params"] = _load_params("configs/model_unimodal.yaml")
+                raw_modality = args.model.replace("unimodal_", "")
+                backbone = "gbdt"
+                if raw_modality.endswith("_mlp"):
+                    backbone = "mlp"
+                    raw_modality = raw_modality.replace("_mlp", "")
+                elif raw_modality.endswith("_gbdt"):
+                    backbone = "gbdt"
+                    raw_modality = raw_modality.replace("_gbdt", "")
+                else:
+                    backbone = _get_unimodal_backbone(args.config)
+                overrides["modality"] = raw_modality
+                if backbone == "mlp":
+                    overrides["model_type"] = "unimodal_mlp"
+                    overrides["params"] = _load_params("configs/model_fusion.yaml")
+                else:
+                    overrides["model_type"] = "unimodal_gbdt"
+                    overrides["params"] = _load_params("configs/model_unimodal.yaml")
             elif args.model in ["fusion_late", "fusion_masked", "fusion_moddrop"]:
                 overrides["model_type"] = args.model
                 overrides["params"] = _load_params("configs/model_fusion.yaml")

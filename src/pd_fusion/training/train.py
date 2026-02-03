@@ -25,7 +25,7 @@ def train_pipeline(config, df_train, df_val, mask_train, mask_val):
         except Exception:
             return {}
 
-    if model_type in ["fusion_late", "fusion_masked", "fusion_moddrop"]:
+    if model_type in ["fusion_late", "fusion_masked", "fusion_moddrop", "unimodal_mlp"]:
         defaults = _load_default("configs/model_fusion.yaml")
         if "hidden_dims" not in config["params"]:
             config["params"] = {**defaults, **config["params"]}
@@ -77,6 +77,25 @@ def train_pipeline(config, df_train, df_val, mask_train, mask_val):
             X_train_mod, imp, scl = preprocess_features(df_train, mod_features)
             X_val_mod, _, _ = preprocess_features(df_val, mod_features, imp, scl)
             model = UnimodalGBDT(modality, config["params"])
+            model.train(X_train_mod, y_train, (X_val_mod, y_val))
+            prep_info = (imp, scl, mod_features)
+            calibrate_X_val = X_val_mod
+
+    elif model_type == "unimodal_mlp":
+        from pd_fusion.models.fusion_late import LateFusionModel
+        modality = config.get("modality", "clinical")
+        mod_features = get_modality_feature_cols(df_train, modality)
+        if not mod_features:
+            logger.warning(f"Unimodal '{modality}' has no features in dataset; using constant baseline.")
+            from pd_fusion.models.dummy import ConstantProbabilityModel
+            model = ConstantProbabilityModel()
+            model.train(np.zeros((len(y_train), 1)), y_train, None)
+            prep_info = (None, None, mod_features)
+            calibrate_X_val = np.zeros((len(y_val), 1))
+        else:
+            X_train_mod, imp, scl = preprocess_features(df_train, mod_features)
+            X_val_mod, _, _ = preprocess_features(df_val, mod_features, imp, scl)
+            model = LateFusionModel(len(mod_features), config["params"])
             model.train(X_train_mod, y_train, (X_val_mod, y_val))
             prep_info = (imp, scl, mod_features)
             calibrate_X_val = X_val_mod

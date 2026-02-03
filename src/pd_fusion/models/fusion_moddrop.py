@@ -59,7 +59,11 @@ class ModalityDropoutModel(BaseModel):
         self.params = params
         self.modality_dims = modality_dims
         self.model = ModalityDropoutNet(modality_dims, params["hidden_dims"], params.get("dropout", 0.2))
-        self.optimizer = optim.Adam(self.model.parameters(), lr=params["lr"])
+        self.optimizer = optim.Adam(
+            self.model.parameters(),
+            lr=params["lr"],
+            weight_decay=params.get("weight_decay", 0.0),
+        )
         self.criterion = nn.BCELoss()
         
     def train(self, X, y, val_data=None):

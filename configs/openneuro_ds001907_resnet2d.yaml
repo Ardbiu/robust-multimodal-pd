@@ -1,6 +1,6 @@
-experiment_name: "openneuro_ds001907_simple"
+experiment_name: "openneuro_ds001907_resnet2d"
 dataset: "openneuro_ds001907"
-data_config: "configs/data_openneuro_ds001907.yaml"
+data_config: "configs/data_openneuro_ds001907_resnet2d.yaml"
 eval_config: "configs/eval_missingness_openneuro_ds001907.yaml"
 
 # Ensure unimodal baselines use the same MLP head as fusion_late for fairness
@@ -8,12 +8,13 @@ unimodal_backbone: "mlp"
 
 model_type: "fusion_moddrop"
 params:
-  hidden_dims: [128, 64]
+  hidden_dims: [256, 128, 64]
   dropout: 0.3
   lr: 0.001
   batch_size: 32
-  epochs: 30
+  epochs: 80
   moddrop_rate: 0.3
+  weight_decay: 0.0005
 
 calibrate: true
 risk_coverage: true

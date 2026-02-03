@@ -22,6 +22,33 @@ PY
 python -m pd_fusion.cli run --config configs/openneuro_ds001907_simple.yaml --k-fold 1
 ```
 
+## Classical baseline (radiomics-lite)
+Set `feature_config.extra_stats: true` in your data config and run:
+```bash
+python -m pd_fusion.cli run --config configs/openneuro_ds001907_simple.yaml --model unimodal_mri_gbdt --k-fold 5
+```
+
+## ResNet2D embeddings (transfer learning, recommended)
+```bash
+python scripts/build_resnet2d_embeddings.py \
+  --manifest /home/adixit1/IEEE-spid/data/processed/openneuro_ds001907_manifest.csv \
+  --out-dir data/processed/openneuro_ds001907/embeddings_resnet2d \
+  --backbone resnet18 \
+  --target-shape 160 160 160 \
+  --slice-axis 2 \
+  --slice-count 24 \
+  --input-size 224 \
+  --batch-size 32 \
+  --tta 1 \
+  --max-rotation-deg 5.0 \
+  --max-translation 0.05 \
+  --intensity-scale 0.1 \
+  --intensity-shift 0.1 \
+  --noise-std 0.01
+```
+
+Then use `configs/openneuro_ds001907_resnet2d.yaml` for runs.
+
 ## CNN embeddings (GPU, optional)
 ```bash
 python scripts/build_cnn3d_embeddings.py \
@@ -45,7 +72,7 @@ python scripts/submit_dual_h200.py \
   --dev-data-dir /home/adixit1/ieee-spid-data/raw_dev \
   --conda-env base \
   --module "deprecated-modules anaconda3/2022.05-x86_64" \
-  --base-config configs/openneuro_ds001907_simple.yaml
+  --base-config configs/openneuro_ds001907_resnet2d.yaml
 ```
 
 ## Aggregation

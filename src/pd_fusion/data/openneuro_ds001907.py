@@ -9,6 +9,7 @@ from pd_fusion.data.schema import TARGET_COL
 from pd_fusion.data.openneuro_features import (
     load_simple_features,
     load_cnn_embeddings,
+    load_resnet2d_embeddings,
 )
 
 def _resolve_manifest_path(config: Dict) -> Path:
@@ -34,6 +35,14 @@ def load_openneuro_ds001907(config: Dict) -> Tuple[pd.DataFrame, Dict[str, np.nd
         df = load_simple_features(manifest_path, Path(feature_cache_dir), config.get("feature_config", {}))
     elif feature_mode == "cnn3d":
         df = load_cnn_embeddings(manifest_path, Path(embedding_cache_dir), config.get("cnn_config", {}))
+    elif feature_mode == "resnet2d":
+        resnet_cache_dir = config.get(
+            "resnet2d_cache_dir",
+            "data/processed/openneuro_ds001907/embeddings_resnet2d"
+        )
+        df = load_resnet2d_embeddings(
+            manifest_path, Path(resnet_cache_dir), config.get("resnet2d_config", {})
+        )
     else:
         raise ValueError(f"Unknown feature_mode: {feature_mode}")
 
