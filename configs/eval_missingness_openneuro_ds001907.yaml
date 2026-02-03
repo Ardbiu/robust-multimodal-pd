@@ -22,3 +22,5 @@ scenarios:
 metrics: ["roc_auc", "pr_auc", "balanced_accuracy", "f1", "ece", "brier_score"]
 calibration_plot: true
 degradation_plot: true
+group_col: "subject_id"
+session_col: "session"
