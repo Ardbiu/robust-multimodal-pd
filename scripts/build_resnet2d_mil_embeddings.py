@@ -81,7 +81,7 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, emb_dim, weights = _build_resnet_backbone(args.backbone)
-    model = model.to(device)
+    model = model.to(device).float()
     model.eval()
 
     if hasattr(weights, "meta"):
@@ -90,8 +90,8 @@ def main():
     else:
         mean_vals = [0.5, 0.5, 0.5]
         std_vals = [0.5, 0.5, 0.5]
-    mean = torch.tensor(mean_vals).view(1, 3, 1, 1).to(device)
-    std = torch.tensor(std_vals).view(1, 3, 1, 1).to(device)
+    mean = torch.tensor(mean_vals, dtype=torch.float32).view(1, 3, 1, 1).to(device)
+    std = torch.tensor(std_vals, dtype=torch.float32).view(1, 3, 1, 1).to(device)
 
     embeddings = []
     for _, row in df.iterrows():
