@@ -19,7 +19,7 @@ SLURM_TEMPLATE = """#!/bin/bash
 #SBATCH --output={log_dir}/{job_name}.out
 #SBATCH --error={log_dir}/{job_name}.err
 #SBATCH --partition={partition}
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:{gpus}
 #SBATCH --time={time_limit}
 #SBATCH --mem={mem}
 #SBATCH --cpus-per-task={cpus}
@@ -78,6 +78,7 @@ def main():
     parser.add_argument("--time", type=str, default="05:00:00")
     parser.add_argument("--mem", type=str, default="64G")
     parser.add_argument("--cpus", type=int, default=8)
+    parser.add_argument("--gpus", type=int, default=1)
     parser.add_argument("--conda-env", type=str, default="base")
     parser.add_argument("--conda-base", type=str, default="", help="Path to conda base (for conda.sh)")
     parser.add_argument("--module", type=str, default="", help="Module(s) to load before conda, e.g. 'deprecated-modules anaconda3/2022.05-x86_64'")
@@ -149,6 +150,7 @@ def main():
             time_limit=args.time,
             mem=args.mem,
             cpus=args.cpus,
+            gpus=args.gpus,
             conda_env=args.conda_env,
             conda_setup=conda_setup,
             conda_activate=conda_activate,
