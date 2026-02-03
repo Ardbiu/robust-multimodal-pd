@@ -1,14 +1,42 @@
 import logging
 import numpy as np
+from pathlib import Path
 from pd_fusion.data.schema import MODALITIES, TARGET_COL
 from pd_fusion.data.preprocess import preprocess_features
 from pd_fusion.data.feature_utils import get_modality_feature_cols, get_all_feature_cols
 from pd_fusion.data.missingness import get_modality_mask_matrix
+from pd_fusion.utils.io import load_yaml
+from pd_fusion.paths import ROOT_DIR
 import torch
 
 def train_pipeline(config, df_train, df_val, mask_train, mask_val):
     logger = logging.getLogger("pd_fusion")
     model_type = config["model_type"]
+    if "params" not in config or not isinstance(config.get("params"), dict):
+        config["params"] = {}
+
+    # Fallback to default params if missing
+    def _load_default(path_str: str):
+        p = Path(path_str)
+        if not p.exists():
+            p = ROOT_DIR / p
+        try:
+            return load_yaml(p).get("params", {})
+        except Exception:
+            return {}
+
+    if model_type in ["fusion_late", "fusion_masked", "fusion_moddrop"]:
+        defaults = _load_default("configs/model_fusion.yaml")
+        if "hidden_dims" not in config["params"]:
+            config["params"] = {**defaults, **config["params"]}
+    elif model_type == "moe":
+        defaults = _load_default("configs/model_moe.yaml")
+        if "expert_hidden_dims" not in config["params"]:
+            config["params"] = {**defaults, **config["params"]}
+    elif model_type == "unimodal_gbdt":
+        defaults = _load_default("configs/model_unimodal.yaml")
+        if not config["params"]:
+            config["params"] = {**defaults, **config["params"]}
     
     # Simple feature concatenation for non-MoE models
     all_features = get_all_feature_cols(df_train)

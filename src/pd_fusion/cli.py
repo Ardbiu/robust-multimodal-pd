@@ -83,7 +83,11 @@ def main():
         if args.model:
             def _load_params(path_str: str):
                 try:
-                    conf = load_yaml(Path(path_str))
+                    p = Path(path_str)
+                    if not p.exists():
+                        from pd_fusion.paths import ROOT_DIR
+                        p = ROOT_DIR / p
+                    conf = load_yaml(p)
                     return conf.get("params", {})
                 except Exception:
                     return {}
