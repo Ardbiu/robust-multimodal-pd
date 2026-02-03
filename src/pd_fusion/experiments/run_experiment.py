@@ -323,6 +323,18 @@ def run_cv_pipeline(config_path: str, k: int = 5, synthetic: bool = False, overr
     else:
         folds = get_kfold_splits(df, n_splits=k, seed=config.get("seed", 42))
     
+    # Track fold assignments (validation fold for each sample)
+    fold_assign = pd.Series([-1] * len(df), index=df.index, name="fold")
+    # Materialize folds to allow assignment and iteration
+    folds = list(folds)
+    for i, (_, val_df_tmp) in enumerate(folds):
+        fold_assign.loc[val_df_tmp.index] = i + 1
+    fold_df = df.copy()
+    fold_df["fold"] = fold_assign.values
+    if group_col and group_col in fold_df.columns:
+        fold_df = fold_df[[group_col, "fold", TARGET_COL] + [c for c in ["session"] if c in fold_df.columns]]
+    fold_df.to_csv(run_dir / "fold_assignments.csv", index=False)
+
     for i, (train_df, val_df) in enumerate(folds):
         logger.info(f"--- Fold {i+1}/{k} ---")
         
