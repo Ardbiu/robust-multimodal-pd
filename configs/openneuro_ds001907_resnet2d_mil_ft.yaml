@@ -1,0 +1,43 @@
+experiment_name: "openneuro_ds001907_resnet2d_mil_ft"
+dataset: "openneuro_ds001907"
+data_config: "configs/data_openneuro_ds001907_resnet2d_mil_ft.yaml"
+eval_config: "configs/eval_missingness_openneuro_ds001907.yaml"
+
+model_type: "mil_attention_ft"
+mil_column: "mri_mil"
+params:
+  backbone: "resnet50"
+  pretrained: true
+  target_shape: [160, 160, 160]
+  slice_axis: 2
+  slice_count: 64
+  input_size: 224
+  slice_batch_size: 16
+  batch_size: 4
+  tta: 2
+  max_rotation_deg: 8.0
+  max_translation: 0.05
+  intensity_scale: 0.15
+  intensity_shift: 0.15
+  noise_std: 0.02
+
+  hidden_dim: 256
+  attn_dim: 128
+  dropout: 0.2
+  lr: 0.0003
+  lr_backbone: 0.0001
+  epochs: 20
+  weight_decay: 0.001
+  freeze_backbone_epochs: 2
+  missing_prob: 0.5
+
+calibrate: true
+risk_coverage: true
+cv_folds: 5
+cv_plot_example: true
+group_col: "subject_id"
+session_col: "session"
+session_shift: false
+nested_calibration: true
+calibration_split: 0.1
+seed: 42

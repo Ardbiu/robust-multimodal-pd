@@ -4,7 +4,6 @@ from typing import Dict
 
 import numpy as np
 import pandas as pd
-import nibabel as nib
 from scipy import ndimage
 
 def _hash_file(path: Path) -> str:
@@ -21,6 +20,7 @@ def _hash_config(cfg: Dict) -> str:
     return hashlib.sha256(str(sorted(cfg.items())).encode()).hexdigest()[:12]
 
 def _load_volume(path: Path, target_shape=(96, 96, 96)):
+    import nibabel as nib
     img = nib.load(str(path))
     data = img.get_fdata().astype(np.float32)
     # Replace NaNs/Infs
@@ -150,14 +150,14 @@ def _select_slices(volume: np.ndarray, axis: int, slice_count: int) -> np.ndarra
         slices = volume[:, :, indices].transpose(2, 0, 1)
     return slices
 
-def _build_resnet_backbone(backbone: str):
+def _build_resnet_backbone(backbone: str, pretrained: bool = True):
     import torch.nn as nn
     from torchvision.models import resnet18, resnet50, ResNet18_Weights, ResNet50_Weights
     if backbone == "resnet50":
-        weights = ResNet50_Weights.DEFAULT
+        weights = ResNet50_Weights.DEFAULT if pretrained else None
         model = resnet50(weights=weights)
     else:
-        weights = ResNet18_Weights.DEFAULT
+        weights = ResNet18_Weights.DEFAULT if pretrained else None
         model = resnet18(weights=weights)
     emb_dim = model.fc.in_features
     model.fc = nn.Identity()

@@ -63,6 +63,27 @@ def train_pipeline(config, df_train, df_val, mask_train, mask_val):
             model = cal_model
         return model, prep_info
 
+    if model_type == "mil_attention_ft":
+        from pd_fusion.models.mil_attention_finetune import MilAttentionFineTuneModel
+        mil_col = config.get("mil_column", "mri_mil")
+        if mil_col not in df_train.columns:
+            raise ValueError(f"MIL column '{mil_col}' not found in training data.")
+        X_train_bags = df_train[mil_col].tolist()
+        X_val_bags = df_val[mil_col].tolist()
+        if not X_train_bags:
+            raise ValueError("No MIL bags found for training.")
+        model = MilAttentionFineTuneModel(config["params"])
+        model.train(X_train_bags, y_train, (X_val_bags, y_val))
+        prep_info = ("mil", mil_col)
+        calibrate_X_val = X_val_bags
+        calibrate_masks = mask_val
+        if config.get("calibrate", False):
+            from pd_fusion.models.calibrate import CalibratedModel
+            cal_model = CalibratedModel(model, method="isotonic")
+            cal_model.fit(calibrate_X_val, y_val, calibrate_masks)
+            model = cal_model
+        return model, prep_info
+
     # Simple feature concatenation for non-MoE models
     all_features = get_all_feature_cols(df_train)
     

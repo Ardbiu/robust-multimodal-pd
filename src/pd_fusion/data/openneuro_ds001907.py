@@ -52,6 +52,12 @@ def load_openneuro_ds001907(config: Dict) -> Tuple[pd.DataFrame, Dict[str, np.nd
         df = load_resnet2d_mil_embeddings(
             manifest_path, Path(resnet_cache_dir), config.get("resnet2d_config", {})
         )
+    elif feature_mode == "resnet2d_mil_ft":
+        df = pd.read_csv(manifest_path)
+        if "t1wbrain_path" not in df.columns:
+            raise ValueError("Manifest is missing t1wbrain_path for MIL fine-tune.")
+        # Store path in mri_mil to reuse MIL pipeline
+        df["mri_mil"] = df["t1wbrain_path"]
     else:
         raise ValueError(f"Unknown feature_mode: {feature_mode}")
 

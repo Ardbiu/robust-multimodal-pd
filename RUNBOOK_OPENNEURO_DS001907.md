@@ -85,6 +85,17 @@ python scripts/build_resnet2d_mil_embeddings.py \
 
 Then use `configs/openneuro_ds001907_resnet2d_mil_multi.yaml` for runs.
 
+## End-to-end MIL fine-tuning (no precomputed embeddings)
+```bash
+python -m pd_fusion.cli run \
+  --config configs/openneuro_ds001907_resnet2d_mil_ft.yaml \
+  --dataset openneuro_ds001907 \
+  --k-fold 5 \
+  --model mil_attention_ft
+```
+
+This uses the manifest paths directly and trains a ResNet2D backbone + attention head end-to-end.
+
 ## Nested CV + subject-level metrics
 OpenNeuro configs now enable nested calibration by default:
 `nested_calibration: true` and `calibration_split: 0.2`.
