@@ -104,6 +104,26 @@ Outputs go to:
 ```
 with summary tables, per‑fold metrics, feature importances, permutation tests, and a ROC‑AUC bar plot.
 
+## PPMI Imaging Upgrade Suite
+
+This suite audits imaging features, builds curated ROI subsets, applies covariate adjustment/harmonization, and re‑runs imaging‑only + fusion models. It also supports harder longitudinal endpoints (conversion/progression).
+
+Config:
+```
+configs/ppmi_imaging_upgrade.yaml
+```
+
+Run:
+```bash
+python scripts/ppmi_imaging_upgrade.py --config configs/ppmi_imaging_upgrade.yaml
+```
+
+Key outputs (per run directory):
+- `summary_mean.csv`, `per_fold_metrics.csv`, `feature_importance.csv`
+- `imaging_missingness_per_feature.csv`, `imaging_missingness_per_subject.csv`
+- `predictions.csv`, `roc_curves.png`, `calibration_curves.png`
+- `paired_tests.json`, `univariate_top.csv`
+
 ## Models & Architectures
 - **Fusion ModDrop**: Late fusion network with randomized modality dropout during training.
 - **MoE**: Mixture of Experts with a router conditioned on the missingness mask.

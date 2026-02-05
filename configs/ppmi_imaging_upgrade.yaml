@@ -1,0 +1,97 @@
+baseline_csv: /home/adixit1/IEEE-spid/data/processed/ppmi/ppmi_subject_baseline.csv
+visit_csv: /home/adixit1/IEEE-spid/data/processed/ppmi/ppmi_visit_level.csv
+
+endpoint:
+  type: pd_vs_hc  # pd_vs_hc | conversion_24m | conversion_36m | progression_24m
+  horizon_months: 24
+  progression_feature: mds_updrs__NP3TOT
+  progression_threshold: 5.0
+
+feature_groups:
+  global_exclude_patterns:
+    - '^.*date.*$'
+    - '^.*time.*$'
+    - '^.*event.*$'
+    - '^.*protocol.*$'
+    - '^.*dose.*$'
+    - '^.*site.*$'
+    - '^.*center.*$'
+    - '^.*scanner.*$'
+    - '^.*acq.*$'
+    - '^.*acquisition.*$'
+    - '^.*series.*$'
+    - '^.*version.*$'
+    - '^.*reason.*$'
+    - '^.*not_analyzed.*$'
+    - '^.*notanalyzed.*$'
+  non_motor_patterns:
+    - moca
+    - cognition
+    - sleep
+    - epworth
+    - rbd
+    - rem
+    - depress
+    - gds
+    - bdi
+    - anxiety
+    - stai
+    - mood
+    - upsit
+    - smell
+    - autonomic
+  datsbr_patterns:
+    - datscan
+    - sbr
+    - putamen
+    - caudate
+    - striat
+    - asym
+  mri_patterns:
+    - mri_derived__
+    - thickness
+    - cortical
+    - volume
+    - area
+    - aseg
+    - hippo
+    - entorhinal
+    - amygdala
+    - caudate
+    - putamen
+    - pallid
+    - thalam
+    - accumbens
+
+covariates:
+  numeric:
+    - demographics__AGE
+    - age_at_visit__AGE
+    - participant_status__ENROLL_AGE
+  categorical:
+    - demographics__SEX
+    - demographics__GENDER
+    - mri_derived__SITE
+    - datscan_sbr__SITE
+    - mri_derived__SCANNER
+    - datscan_sbr__SCANNER
+    - mri_derived__PROTOCOL
+    - datscan_sbr__PROTOCOL
+
+harmonization:
+  method: none  # none | combat | site_zscore
+  site_cols:
+    - mri_derived__SITE
+    - datscan_sbr__SITE
+    - mri_derived__SCANNER
+    - datscan_sbr__SCANNER
+    - mri_derived__PROTOCOL
+    - datscan_sbr__PROTOCOL
+
+models:
+  - logreg
+  - lgbm
+
+cv:
+  folds: 5
+  seeds: [42, 43, 44]
