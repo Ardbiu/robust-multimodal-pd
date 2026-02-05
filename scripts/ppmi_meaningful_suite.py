@@ -19,6 +19,20 @@ from pd_fusion.utils.metrics import compute_metrics
 
 
 ID_COLS = {"subject_id", "visit_id", "visit_month", "date"}
+GLOBAL_EXCLUDE_REGEX = [
+    r"^.*date.*$",
+    r"^.*time.*$",
+    r"^.*event.*$",
+    r"^.*protocol.*$",
+    r"^.*dose.*$",
+    r"^.*site.*$",
+    r"^.*center.*$",
+    r"^.*scanner.*$",
+    r"^.*acq.*$",
+    r"^.*acquisition.*$",
+    r"^.*series.*$",
+    r"^.*version.*$",
+]
 
 SETTINGS = {
     "full_clinical": {
@@ -62,7 +76,6 @@ SETTINGS = {
             r"putamen",
             r"caudate",
             r"striat",
-            r"dat",
         ],
     },
     "freesurfer_only": {
@@ -111,14 +124,17 @@ def load_dataset(path: Path) -> pd.DataFrame:
 
 
 def select_numeric(df: pd.DataFrame, cols: List[str]) -> pd.DataFrame:
-    out = pd.DataFrame(index=df.index)
-    for col in cols:
-        out[col] = pd.to_numeric(df[col], errors="coerce")
-    return out
+    if not cols:
+        return pd.DataFrame(index=df.index)
+    return df.loc[:, cols].apply(pd.to_numeric, errors="coerce")
 
 
 def get_all_numeric_features(df: pd.DataFrame) -> List[str]:
     cols = [c for c in df.columns if c not in ID_COLS and c != "label"]
+    cols = [
+        c for c in cols
+        if not any(re.search(p, c, re.IGNORECASE) for p in GLOBAL_EXCLUDE_REGEX)
+    ]
     num_df = select_numeric(df, cols)
     keep = [c for c in num_df.columns if num_df[c].notna().any()]
     return keep
