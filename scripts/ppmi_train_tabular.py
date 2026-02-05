@@ -2,6 +2,7 @@ import argparse
 import datetime
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -60,7 +61,12 @@ def _split_df(df: pd.DataFrame, split_ids: Dict[str, List[str]]) -> Tuple[pd.Dat
     return train_df, val_df, test_df
 
 
-def _build_preprocessor(scale: bool, numeric_cols: List[str], cat_cols: List[str]) -> ColumnTransformer:
+def _build_preprocessor(
+    scale: bool,
+    numeric_cols: List[str],
+    cat_cols: List[str],
+    num_threads: int,
+) -> ColumnTransformer:
     num_steps = [
         ("imputer", SimpleImputer(strategy="median", add_indicator=True)),
     ]
@@ -78,10 +84,14 @@ def _build_preprocessor(scale: bool, numeric_cols: List[str], cat_cols: List[str
         ("onehot", onehot),
     ])
 
-    return ColumnTransformer([
-        ("num", num_pipe, numeric_cols),
-        ("cat", cat_pipe, cat_cols),
-    ], remainder="drop")
+    return ColumnTransformer(
+        [
+            ("num", num_pipe, numeric_cols),
+            ("cat", cat_pipe, cat_cols),
+        ],
+        remainder="drop",
+        n_jobs=num_threads,
+    )
 
 
 def _fit_transform(
@@ -96,7 +106,7 @@ def _fit_transform(
     return X_train_t, X_val_t, X_test_t
 
 
-def _get_tree_model(seed: int, logger: logging.Logger):
+def _get_tree_model(seed: int, logger: logging.Logger, num_threads: int):
     try:
         from lightgbm import LGBMClassifier
         return LGBMClassifier(
@@ -106,6 +116,8 @@ def _get_tree_model(seed: int, logger: logging.Logger):
             num_leaves=31,
             subsample=0.9,
             colsample_bytree=0.9,
+            num_threads=num_threads,
+            force_col_wise=True,
             random_state=seed,
             class_weight="balanced",
         )
@@ -121,6 +133,7 @@ def _get_tree_model(seed: int, logger: logging.Logger):
             colsample_bytree=0.9,
             eval_metric="logloss",
             random_state=seed,
+            n_jobs=num_threads,
         )
     except Exception as exc:
         logger.warning("XGBoost not available: %s", exc)
@@ -210,6 +223,7 @@ def main() -> None:
     parser.add_argument("--config", required=True)
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--out_dir", default=None)
+    parser.add_argument("--num-threads", type=int, default=2)
     parser.add_argument("--limit", type=int, default=None, help="Optional limit for smoke tests")
     args = parser.parse_args()
 
@@ -219,6 +233,12 @@ def main() -> None:
     logger = setup_logging(out_dir)
     import yaml
     (out_dir / "config_resolved.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False))
+
+    os.environ["OMP_NUM_THREADS"] = str(args.num_threads)
+    os.environ["MKL_NUM_THREADS"] = str(args.num_threads)
+    os.environ["OPENBLAS_NUM_THREADS"] = str(args.num_threads)
+    os.environ["NUMEXPR_NUM_THREADS"] = str(args.num_threads)
+    torch.set_num_threads(args.num_threads)
 
     processed_dir = Path(cfg["processed_ppmi_dir"])
     level = cfg.get("modeling_level", "baseline")
@@ -294,22 +314,22 @@ def main() -> None:
 
             for model_name in models:
                 if model_name == "logreg":
-                    preprocessor = _build_preprocessor(True, numeric_cols, cat_cols)
+                    preprocessor = _build_preprocessor(True, numeric_cols, cat_cols, args.num_threads)
                     X_train_t, X_val_t, X_test_t = _fit_transform(preprocessor, X_train, X_val, X_test)
-                    clf = LogisticRegression(max_iter=1000, class_weight="balanced")
+                    clf = LogisticRegression(max_iter=1000, class_weight="balanced", n_jobs=args.num_threads)
                     clf.fit(X_train_t, y_train)
                     y_prob = clf.predict_proba(X_test_t)[:, 1]
                 elif model_name == "lgbm":
-                    preprocessor = _build_preprocessor(False, numeric_cols, cat_cols)
+                    preprocessor = _build_preprocessor(False, numeric_cols, cat_cols, args.num_threads)
                     X_train_t, X_val_t, X_test_t = _fit_transform(preprocessor, X_train, X_val, X_test)
-                    clf = _get_tree_model(seed, logger)
+                    clf = _get_tree_model(seed, logger, args.num_threads)
                     clf.fit(X_train_t, y_train)
                     if hasattr(clf, "predict_proba"):
                         y_prob = clf.predict_proba(X_test_t)[:, 1]
                     else:
                         y_prob = clf.predict(X_test_t)
                 elif model_name == "mlp":
-                    preprocessor = _build_preprocessor(True, numeric_cols, cat_cols)
+                    preprocessor = _build_preprocessor(True, numeric_cols, cat_cols, args.num_threads)
                     X_train_t, X_val_t, X_test_t = _fit_transform(preprocessor, X_train, X_val, X_test)
                     _, _, mlp_model = _train_mlp(X_train_t, y_train, X_val_t, y_val, seed, cfg.get("mlp", {}))
                     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
