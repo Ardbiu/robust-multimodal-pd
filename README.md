@@ -80,6 +80,30 @@ python scripts/ppmi_eval_report.py --config configs/ppmi_studydata.yaml --out_di
 scripts/ppmi_smoke.sh configs/ppmi_studydata.yaml
 ```
 
+## Meaningful PPMI baselines
+
+We provide a focused baseline suite for PD vs HC that separates motor vs non‑motor contributions and imaging‑only signals.
+
+Settings:
+- `full_clinical`: all numeric features (current baseline).
+- `no_motor_exam`: drops MDS‑UPDRS + NHY + tremor/rigidity/bradykinesia columns.
+- `non_motor_only`: cognition, sleep, mood/anxiety/depression, UPSIT/olfaction.
+- `datsbr_only`: DAT SBR‑related columns.
+- `freesurfer_only`: MRI‑derived cortical thickness/volume/area.
+- `fusion_nonmotor_imaging`: non‑motor + DAT SBR + MRI‑derived.
+
+Run it:
+```bash
+python scripts/ppmi_meaningful_suite.py \
+  --input-csv /home/adixit1/IEEE-spid/data/processed/ppmi/ppmi_subject_baseline.csv
+```
+
+Outputs go to:
+```
+/home/adixit1/IEEE-spid/runs/ppmi_meaningful_suite_<timestamp>/
+```
+with summary tables, per‑fold metrics, feature importances, permutation tests, and a ROC‑AUC bar plot.
+
 ## Models & Architectures
 - **Fusion ModDrop**: Late fusion network with randomized modality dropout during training.
 - **MoE**: Mixture of Experts with a router conditioned on the missingness mask.
