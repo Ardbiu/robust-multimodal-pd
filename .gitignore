@@ -13,3 +13,6 @@ data/processed/openneuro_ds001907/
 # Allow raw_dev (UCI/OpenNeuro small datasets)
 !data/raw_dev/
 !data/raw_dev/**
+
+# Local data folders
+Data1/
