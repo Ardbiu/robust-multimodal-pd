@@ -225,7 +225,9 @@ def main() -> None:
     dataset_path = processed_dir / ("ppmi_visit_level.csv" if level == "visit" else "ppmi_subject_baseline.csv")
     schema_path = processed_dir / "ppmi_feature_schema.json"
 
-    df = pd.read_csv(dataset_path)
+    df = pd.read_csv(dataset_path, low_memory=False)
+    if "subject_id" in df.columns:
+        df["subject_id"] = df["subject_id"].astype(str)
     schema = json.loads(schema_path.read_text())
 
     if args.limit:
@@ -255,10 +257,23 @@ def main() -> None:
         split_path = processed_dir / f"ppmi_splits_seed{seed}.json"
         if split_path.exists():
             split_ids = json.loads(split_path.read_text())
+            split_ids = {
+                k: [str(v) for v in ids]
+                for k, ids in split_ids.items()
+            }
         else:
             labels = df.set_index("subject_id")["label"]
             split_ids = create_splits(labels, [seed], split_cfg)[seed]
         train_df, val_df, test_df = _split_df(df, split_ids)
+        if train_df.empty or val_df.empty or test_df.empty:
+            logger.warning(
+                "Empty split for seed %s (train=%d, val=%d, test=%d); check subject_id types.",
+                seed,
+                len(train_df),
+                len(val_df),
+                len(test_df),
+            )
+            continue
 
         for ablation in ablations:
             feat_cols = _select_feature_cols(schema, ablation["groups"])
