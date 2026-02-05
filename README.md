@@ -35,6 +35,51 @@ Execute the research pipeline using a specific configuration:
 python -m pd_fusion.cli run --config configs/model_fusion.yaml
 ```
 
+## PPMI Study Data Pipeline (Tabular)
+
+This pipeline ingests PPMI “Study Data” tables (CSV) and builds baseline/visit-level datasets.
+
+### 1. Place raw study-data CSVs (or ZIPs)
+Put PPMI study-data downloads under:
+```
+/home/adixit1/IEEE-spid/data/raw_ppmi/study_data/
+```
+If ZIPs are present, the build script will extract them automatically.
+
+### 2. Build processed datasets
+```bash
+python scripts/ppmi_build_dataset.py --config configs/ppmi_studydata.yaml
+```
+Outputs are written to:
+```
+/home/adixit1/IEEE-spid/data/processed/ppmi/
+```
+Key artifacts:
+- `ppmi_subject_baseline.csv`
+- `ppmi_visit_level.csv`
+- `ppmi_feature_schema.json`
+- `ppmi_splits_seed{SEED}.json`
+- `ppmi_manifest.md`
+
+### 3. Train tabular baselines + ablations
+```bash
+python scripts/ppmi_train_tabular.py --config configs/ppmi_studydata.yaml
+```
+This writes results to:
+```
+/home/adixit1/IEEE-spid/runs/ppmi_tabular_<timestamp>/
+```
+
+### 4. Generate summary/ranking table
+```bash
+python scripts/ppmi_eval_report.py --config configs/ppmi_studydata.yaml --out_dir /home/adixit1/IEEE-spid/runs/ppmi_tabular_<timestamp>
+```
+
+### Smoke test
+```bash
+scripts/ppmi_smoke.sh configs/ppmi_studydata.yaml
+```
+
 ## Models & Architectures
 - **Fusion ModDrop**: Late fusion network with randomized modality dropout during training.
 - **MoE**: Mixture of Experts with a router conditioned on the missingness mask.

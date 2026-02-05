@@ -1,6 +1,7 @@
 # General data ignore
-data/
-runs/
+/data/
+/runs/
+/PPMIdata/
 __pycache__/
 *.pyc
 *.pkl

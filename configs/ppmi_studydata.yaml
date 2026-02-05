@@ -1,0 +1,156 @@
+raw_ppmi_dir: /home/adixit1/IEEE-spid/data/raw_ppmi
+study_data_dir: /home/adixit1/IEEE-spid/data/raw_ppmi/study_data
+processed_ppmi_dir: /home/adixit1/IEEE-spid/data/processed/ppmi
+extract_zips: true
+
+column_candidates:
+  subject_id:
+    - PATNO
+    - SUBJECT_ID
+    - participant_id
+  visit_id:
+    - EVENT_ID
+    - VISIT_ID
+    - VISIT
+  visit_month:
+    - VISIT_MONTH
+    - MONTHS_SINCE_BL
+  date:
+    - INFODT
+    - EXAMDATE
+
+label:
+  diagnosis_column_candidates:
+    - DIAGNOSIS
+    - COHORT
+    - COHORT_DESCRIPTION
+    - ENROLL_CAT
+    - CURRENT_DIAGNOSIS
+    - PRIMDIAG
+  positive_values:
+    - pd
+    - parkinson
+    - parkinson's disease
+  negative_values:
+    - hc
+    - healthy
+    - control
+  exclude_values:
+    - swedd
+    - prodromal
+    - genetic
+    - other
+    - unknown
+
+baseline:
+  visit_id_priority:
+    - BL
+    - SC
+    - V01
+
+splits:
+  seeds: [42, 43, 44, 45, 46]
+  train_size: 0.7
+  val_size: 0.15
+  test_size: 0.15
+
+modeling_level: baseline
+
+ablations:
+  - name: clinical_only
+    groups: [clinical]
+  - name: mri_only
+    groups: [mri_derived]
+  - name: datsbr_only
+    groups: [datsbr]
+  - name: clinical_mri
+    groups: [clinical, mri_derived]
+  - name: clinical_datsbr
+    groups: [clinical, datsbr]
+  - name: full_fusion
+    groups: [clinical, mri_derived, datsbr, nonmotor]
+
+models: [logreg, lgbm, mlp]
+
+mlp:
+  hidden_dims: [128, 64]
+  dropout: 0.3
+  max_epochs: 100
+  lr: 0.001
+  patience: 10
+
+tables:
+  participant_status:
+    patterns:
+      - "*Participant*Status*.csv"
+      - "*Participant_Status*.csv"
+      - "*Subject_Status*.csv"
+    group: labels
+  subject_cohort:
+    patterns:
+      - "*Subject_Cohort_History*.csv"
+      - "*Subject_Cohort*.csv"
+      - "*Cohort*.csv"
+    group: labels
+  demographics:
+    patterns:
+      - "*Demographics*.csv"
+      - "*Demographic*.csv"
+    group: clinical
+  age_at_visit:
+    patterns:
+      - "*Age_at_visit*.csv"
+      - "*Age*.csv"
+    group: clinical
+  mds_updrs:
+    patterns:
+      - "*MDS_UPDRS*.csv"
+      - "*UPDRS*.csv"
+    group: clinical
+  moca:
+    patterns:
+      - "*MoCA*.csv"
+    group: nonmotor
+  depression:
+    patterns:
+      - "*GDS*.csv"
+      - "*Depression*.csv"
+      - "*BDI*.csv"
+    group: nonmotor
+  anxiety:
+    patterns:
+      - "*Anxiety*.csv"
+      - "*STAI*.csv"
+    group: nonmotor
+  sleep:
+    patterns:
+      - "*Sleep*.csv"
+      - "*RBD*.csv"
+      - "*Epworth*.csv"
+    group: nonmotor
+  upsit:
+    patterns:
+      - "*UPSIT*.csv"
+      - "*Smell*.csv"
+    group: nonmotor
+  mri_derived:
+    patterns:
+      - "*MRI*Analysis*Results*.csv"
+      - "*Cortical*Thickness*.csv"
+      - "*Surface*Area*.csv"
+      - "*aseg*.csv"
+      - "*GM*Volume*.csv"
+      - "*MRIQC*.csv"
+    group: mri_derived
+  datscan_sbr:
+    patterns:
+      - "*DATSCAN*QUANT*.csv"
+      - "*DaTSCAN*Quant*.csv"
+      - "*SBR*.csv"
+      - "*Xing*Core*Lab*.csv"
+    group: datsbr
+  datscan_visual:
+    patterns:
+      - "*DATSCAN*Visual*.csv"
+      - "*DaTSCAN*Visual*.csv"
+    group: datsbr
