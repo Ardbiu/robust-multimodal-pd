@@ -424,6 +424,7 @@ def main():
     parser.add_argument("--num-threads", type=int, default=2)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--no-plot", action="store_true")
+    parser.add_argument("--no-shap", action="store_true")
     args = parser.parse_args()
 
     cfg = yaml.safe_load(Path(args.config).read_text())
@@ -680,6 +681,48 @@ def main():
             plt.close(fig)
         except Exception as exc:
             logger.warning("Plot generation failed: %s", exc)
+
+    if not args.no_shap:
+        try:
+            import shap
+            best = summary.sort_values("roc_auc_mean", ascending=False).iloc[0]
+            setting = best["setting"]
+            model = best["model"]
+            feature_cols = settings.get(setting, [])
+            if feature_cols:
+                full_df = df.copy()
+                imaging_in_setting = [c for c in feature_cols if c in imaging_cols]
+                if imaging_in_setting:
+                    full_df, _ = adjust_features(full_df, full_df, imaging_in_setting, num_covs, cat_covs)
+                    full_df, _ = apply_harmonization(full_df, full_df, imaging_in_setting, harm_method, harm_site_cols, logger)
+                X_full = select_numeric(full_df, feature_cols)
+                imputer = SimpleImputer(strategy="median", add_indicator=True)
+                X_imp = imputer.fit_transform(X_full)
+                feat_names = list(feature_cols)
+                if imputer.indicator_ is not None:
+                    for idx in imputer.indicator_.features_:
+                        feat_names.append(f"{feature_cols[idx]}_missing")
+                scaler = StandardScaler()
+                X_scaled = scaler.fit_transform(X_imp)
+                clf = fit_model(model, seeds[0], args.num_threads, logger)
+                X_train = X_scaled if model == "logreg" else X_imp
+                clf.fit(X_train, full_df["label"].values)
+                sample_idx = np.random.default_rng(seeds[0]).choice(len(full_df), size=min(500, len(full_df)), replace=False)
+                X_sample = X_train[sample_idx]
+                if model == "lgbm" and hasattr(clf, "predict_proba"):
+                    explainer = shap.TreeExplainer(clf)
+                    shap_vals = explainer.shap_values(X_sample)
+                    if isinstance(shap_vals, list):
+                        shap_vals = shap_vals[1]
+                else:
+                    explainer = shap.LinearExplainer(clf, X_sample)
+                    shap_vals = explainer.shap_values(X_sample)
+                mean_abs = np.mean(np.abs(shap_vals), axis=0)
+                shap_df = pd.DataFrame({"feature": feat_names, "mean_abs_shap": mean_abs})
+                shap_df = shap_df.sort_values("mean_abs_shap", ascending=False)
+                shap_df.to_csv(out_dir / "shap_summary.csv", index=False)
+        except Exception as exc:
+            logger.warning("SHAP computation skipped: %s", exc)
 
     logger.info("Saved summary to %s", out_dir / "summary_mean.csv")
 
