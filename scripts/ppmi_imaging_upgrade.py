@@ -317,6 +317,18 @@ def build_endpoint_labels(
     visit_df = visit_df.dropna(subset=["label"]).copy()
     if "visit_month" not in visit_df.columns:
         raise ValueError("visit_month required for longitudinal endpoints")
+    # Derive visit_month from visit_id if missing
+    if visit_df["visit_month"].isna().all():
+        if "visit_id" in visit_df.columns:
+            s = visit_df["visit_id"].astype(str).str.upper()
+            derived = pd.to_numeric(s.str.extract(r"(\\d+)", expand=False), errors="coerce")
+            bl_mask = s.isin({"BL", "BASELINE", "SCR", "SCREEN", "SC", "ENRL"})
+            derived.loc[bl_mask] = 0
+            visit_df = visit_df.copy()
+            visit_df["visit_month"] = derived
+            logger.info("Derived visit_month from visit_id for longitudinal endpoints")
+        else:
+            raise ValueError("visit_month missing and visit_id not available")
 
     base = baseline_df[["subject_id"]].copy()
 
@@ -370,8 +382,10 @@ def build_endpoint_labels(
 
         target = target.reset_index()
         if target.empty:
-            logger.warning("No progression targets found for feature %s (horizon=%s)", feature, horizon)
-            return baseline_df.drop(columns=["label"], errors="ignore").iloc[0:0].copy()
+            raise ValueError(
+                f"No progression targets found for feature {feature} (horizon={horizon}). "
+                "Check visit_month/visit_id parsing or choose a different progression_feature."
+            )
 
         if used_beyond > 0:
             logger.info("Progression: using %d subjects with visits beyond %s months", used_beyond, horizon)
