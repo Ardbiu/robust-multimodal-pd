@@ -318,9 +318,12 @@ def build_endpoint_labels(
     if "visit_month" not in visit_df.columns:
         raise ValueError("visit_month required for longitudinal endpoints")
 
-    base = baseline_df[["subject_id", "label"]].copy()
+    base = baseline_df[["subject_id"]].copy()
 
     if endpoint.startswith("conversion"):
+        # Only subjects who are HC at baseline can convert
+        baseline_labels = baseline_df[["subject_id", "label"]].copy()
+        base = base.merge(baseline_labels, on="subject_id", how="left")
         base = base[base["label"] == 0].copy()
         visit_df = visit_df[visit_df["subject_id"].isin(base["subject_id"])].copy()
         visit_df = visit_df[(visit_df["visit_month"].notna()) & (visit_df["visit_month"] <= horizon)]
@@ -330,19 +333,57 @@ def build_endpoint_labels(
         base["label"] = base["conversion_label"]
         base = base.drop(columns=["conversion_label"])
         logger.info("Conversion endpoint: %d subjects", len(base))
-        return baseline_df.merge(base[["subject_id", "label"]], on="subject_id", how="right")
+        out = baseline_df.drop(columns=["label"], errors="ignore").merge(
+            base[["subject_id", "label"]], on="subject_id", how="right"
+        )
+        return out
 
     if endpoint.startswith("progression"):
         feature = endpoint_cfg.get("progression_feature", "mds_updrs__NP3TOT")
         threshold = endpoint_cfg.get("progression_threshold", 5.0)
+        allow_beyond = bool(endpoint_cfg.get("progression_allow_beyond_horizon", True))
+        max_months = endpoint_cfg.get("progression_max_months", None)
+
         baseline_feature = baseline_df[["subject_id", feature]].copy()
+        visit_df = visit_df.copy()
         visit_df = visit_df[visit_df[feature].notna()].copy()
-        target = visit_df[(visit_df["visit_month"].notna()) & (visit_df["visit_month"] <= horizon)]
-        target = target.sort_values("visit_month").groupby("subject_id").last().reset_index()
-        merged = baseline_feature.merge(target[["subject_id", feature]], on="subject_id", suffixes=("_base", "_target"))
+        visit_df = visit_df[visit_df["visit_month"].notna()].copy()
+        visit_df["visit_month"] = pd.to_numeric(visit_df["visit_month"], errors="coerce")
+        visit_df = visit_df[visit_df["visit_month"].notna()].copy()
+
+        if max_months is not None:
+            visit_df = visit_df[visit_df["visit_month"] <= max_months].copy()
+
+        # Prefer latest visit <= horizon
+        target = visit_df[visit_df["visit_month"] <= horizon]
+        target = target.sort_values("visit_month").groupby("subject_id").last()
+
+        used_beyond = 0
+        if allow_beyond:
+            # For subjects with no visit <= horizon, use earliest visit > horizon
+            future = visit_df[visit_df["visit_month"] > horizon]
+            future = future.sort_values("visit_month").groupby("subject_id").first()
+            missing_subjects = future.index.difference(target.index)
+            if len(missing_subjects) > 0:
+                target = pd.concat([target, future.loc[missing_subjects]], axis=0)
+                used_beyond = len(missing_subjects)
+
+        target = target.reset_index()
+        if target.empty:
+            logger.warning("No progression targets found for feature %s (horizon=%s)", feature, horizon)
+            return baseline_df.drop(columns=["label"], errors="ignore").iloc[0:0].copy()
+
+        if used_beyond > 0:
+            logger.info("Progression: using %d subjects with visits beyond %s months", used_beyond, horizon)
+
+        merged = baseline_feature.merge(
+            target[["subject_id", feature]], on="subject_id", suffixes=("_base", "_target")
+        )
         merged["delta"] = merged[f"{feature}_target"] - merged[f"{feature}_base"]
         merged["label"] = (merged["delta"] >= threshold).astype(int)
-        out = baseline_df.merge(merged[["subject_id", "label"]], on="subject_id", how="inner")
+        out = baseline_df.drop(columns=["label"], errors="ignore").merge(
+            merged[["subject_id", "label"]], on="subject_id", how="inner"
+        )
         logger.info("Progression endpoint: %d subjects", len(out))
         return out
 

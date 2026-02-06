@@ -10,6 +10,8 @@ endpoint:
   horizon_months: 24
   progression_feature: mds_updrs__NP3TOT
   progression_threshold: 5.0
+  progression_allow_beyond_horizon: true
+  progression_max_months: 36
 
 feature_groups:
   global_exclude_patterns:
