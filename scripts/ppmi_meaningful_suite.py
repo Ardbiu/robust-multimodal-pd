@@ -168,9 +168,14 @@ def apply_setting(df: pd.DataFrame, setting: str, cache: Dict[str, List[str]]) -
     return cols
 
 
-def prepare_matrices(df: pd.DataFrame, feature_cols: List[str], scale: bool):
+def prepare_matrices(
+    df: pd.DataFrame,
+    feature_cols: List[str],
+    scale: bool,
+    add_missing_indicators: bool,
+):
     X = select_numeric(df, feature_cols)
-    imputer = SimpleImputer(strategy="median", add_indicator=True)
+    imputer = SimpleImputer(strategy="median", add_indicator=add_missing_indicators)
     X_imp = imputer.fit_transform(X)
     feature_names = list(feature_cols)
     if imputer.indicator_ is not None:
@@ -263,6 +268,7 @@ def main():
     parser.add_argument("--num-threads", type=int, default=2)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--no-plot", action="store_true")
+    parser.add_argument("--no-missing-indicators", action="store_true")
     args = parser.parse_args()
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -279,6 +285,8 @@ def main():
 
     df = load_dataset(Path(args.input_csv))
     df = df.dropna(subset=["label"]).copy()
+    prevalence = float(df["label"].mean()) if len(df) else float("nan")
+    logger.info("Label prevalence (positive class=1): %.4f", prevalence)
 
     if args.limit:
         df = df.sample(n=min(args.limit, len(df)), random_state=args.seed)
@@ -322,7 +330,10 @@ def main():
             y_test = test_df["label"].values
 
             X_train, imputer, scaler, feat_names = prepare_matrices(
-                train_df, feature_cols, scale=True
+                train_df,
+                feature_cols,
+                scale=True,
+                add_missing_indicators=not args.no_missing_indicators,
             )
             X_test = transform_matrix(test_df, feature_cols, imputer, scaler)
 
@@ -345,6 +356,7 @@ def main():
                     "setting": setting,
                     "model": model_name,
                     "fold": fold,
+                    "prevalence": float(np.mean(y_test)),
                     **metrics,
                 })
 
@@ -373,6 +385,8 @@ def main():
 
     summary = per_fold_df.groupby(["setting", "model"]).agg(["mean", "std"]).reset_index()
     summary.columns = ["_".join([c for c in col if c]) if isinstance(col, tuple) else col for col in summary.columns]
+    counts = per_fold_df.groupby(["setting", "model"]).size().reset_index(name="fold_count")
+    summary = summary.merge(counts, on=["setting", "model"], how="left")
     summary.to_csv(out_dir / "summary_mean.csv", index=False)
 
     feat_df = pd.DataFrame(feature_rows)
