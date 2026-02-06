@@ -104,6 +104,21 @@ Outputs go to:
 ```
 with summary tables, per‑fold metrics, feature importances, permutation tests, and a ROC‑AUC bar plot.
 
+### Results snapshot (PPMI Study Data, subject‑level, 5‑fold CV)
+Latest run (ppmi_meaningful_suite_20260205_193012), PD prevalence = 0.822.
+Below shows **best model per setting** (ROC‑AUC mean±std across folds). PR‑AUC is reported for PD as the positive class; its baseline is the prevalence.
+
+| Setting | Model | ROC‑AUC | PR‑AUC | BalAcc | F1 | Brier | ECE |
+|---|---|---|---|---|---|---|---|
+| full_clinical | lgbm | 0.986 ± 0.0049 | 0.9968 ± 0.0012 | 0.9266 ± 0.0223 | 0.9757 ± 0.0063 | 0.0322 ± 0.0081 | 0.1706 ± 0.0065 |
+| no_motor_exam | lgbm | 0.9278 ± 0.0170 | 0.9838 ± 0.0037 | 0.8140 ± 0.0371 | 0.9204 ± 0.0159 | 0.0909 ± 0.0153 | 0.1301 ± 0.0165 |
+| non_motor_only | lgbm | 0.9178 ± 0.0202 | 0.9807 ± 0.0047 | 0.8039 ± 0.0344 | 0.9287 ± 0.0125 | 0.1008 ± 0.0133 | 0.1568 ± 0.0126 |
+| fusion_nonmotor_imaging | lgbm | 0.9178 ± 0.0178 | 0.9807 ± 0.0042 | 0.8065 ± 0.0382 | 0.9294 ± 0.0110 | 0.0995 ± 0.0124 | 0.1551 ± 0.0159 |
+| datsbr_only | lgbm | 0.5162 ± 0.0091 | 0.8288 ± 0.0030 | 0.5165 ± 0.0094 | 0.0889 ± 0.0243 | 0.2485 ± 0.0038 | 0.3016 ± 0.0055 |
+| freesurfer_only | logreg | 0.5661 ± 0.0343 | 0.8501 ± 0.0159 | 0.5566 ± 0.0242 | 0.8251 ± 0.0160 | 0.2437 ± 0.0068 | 0.2469 ± 0.0152 |
+
+Interpretation: clinical measures dominate PD vs HC; imaging‑only signals are near‑chance on the full cohort. Fusion does not materially improve over non‑motor alone on the full cohort, which is consistent with heavy imaging missingness. Use the imaging‑available cohort analysis (see Imaging Upgrade Suite) for a fair test of imaging contribution.
+
 ## PPMI Imaging Upgrade Suite
 
 This suite audits imaging features, builds curated ROI subsets, applies covariate adjustment/harmonization, and re‑runs imaging‑only + fusion models. It also supports harder longitudinal endpoints (conversion/progression).
