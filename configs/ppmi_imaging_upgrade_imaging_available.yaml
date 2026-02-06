@@ -1,0 +1,41 @@
+baseline_csv: /home/adixit1/IEEE-spid/data/processed/ppmi/ppmi_subject_baseline.csv
+visit_csv: /home/adixit1/IEEE-spid/data/processed/ppmi/ppmi_visit_level.csv
+
+cv:
+  folds: 5
+  seeds: [42, 43, 44]
+
+endpoint:
+  type: pd_vs_hc
+
+cohort:
+  imaging_available_only: true
+  require_any: true
+  require_dat: false
+  require_mri: false
+
+feature_groups:
+  global_exclude_patterns:
+    - "^.*date.*$"
+    - "^.*time.*$"
+    - "^.*event.*$"
+    - "^.*protocol.*$"
+    - "^.*dose.*$"
+    - "^.*site.*$"
+    - "^.*center.*$"
+    - "^.*scanner.*$"
+    - "^.*acq.*$"
+    - "^.*acquisition.*$"
+    - "^.*series.*$"
+    - "^.*version.*$"
+    - "^.*reason.*$"
+    - "^.*not_analyzed.*$"
+    - "^.*notanalyzed.*$"
+
+covariates:
+  numeric: [age]
+  categorical: [sex]
+
+harmonization:
+  method: none
+  site_cols: []

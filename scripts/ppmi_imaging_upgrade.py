@@ -431,6 +431,7 @@ def main():
     endpoint_cfg = cfg.get("endpoint", {})
     seeds = cfg.get("cv", {}).get("seeds", [42])
     folds = int(cfg.get("cv", {}).get("folds", 5))
+    cohort_cfg = cfg.get("cohort", {})
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     out_dir = Path(args.out_dir or f"runs/ppmi_imaging_upgrade_{timestamp}")
@@ -486,6 +487,48 @@ def main():
 
     (out_dir / "kept_dropped_columns.json").write_text(json.dumps(kept_dropped, indent=2))
     (out_dir / "imaging_columns.json").write_text(json.dumps({"datsbr": dat_cols, "mri": mri_cols}, indent=2))
+
+    # Imaging-available cohort filtering
+    def _availability_mask(frame: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
+        dat_mask = (
+            select_numeric(frame, dat_cols).notna().any(axis=1).to_numpy()
+            if dat_cols else np.zeros(len(frame), dtype=bool)
+        )
+        mri_mask = (
+            select_numeric(frame, mri_cols).notna().any(axis=1).to_numpy()
+            if mri_cols else np.zeros(len(frame), dtype=bool)
+        )
+        return dat_mask, mri_mask
+
+    dat_avail, mri_avail = _availability_mask(df)
+    any_imaging = dat_avail | mri_avail
+    avail_summary = {
+        "total_subjects": int(len(df)),
+        "dat_available": int(dat_avail.sum()),
+        "mri_available": int(mri_avail.sum()),
+        "any_imaging_available": int(any_imaging.sum()),
+        "dat_available_rate": float(dat_avail.mean()) if len(df) else 0.0,
+        "mri_available_rate": float(mri_avail.mean()) if len(df) else 0.0,
+        "any_imaging_available_rate": float(any_imaging.mean()) if len(df) else 0.0,
+    }
+    (out_dir / "imaging_availability_summary.json").write_text(json.dumps(avail_summary, indent=2))
+
+    if cohort_cfg.get("imaging_available_only", False):
+        require_dat = cohort_cfg.get("require_dat", False)
+        require_mri = cohort_cfg.get("require_mri", False)
+        require_any = cohort_cfg.get("require_any", True)
+        if require_dat and require_mri:
+            mask = dat_avail & mri_avail
+        elif require_dat:
+            mask = dat_avail
+        elif require_mri:
+            mask = mri_avail
+        elif require_any:
+            mask = any_imaging
+        else:
+            mask = np.ones(len(df), dtype=bool)
+        df = df.loc[mask].copy()
+        logger.info("Imaging-available cohort filter applied: %d subjects", len(df))
 
     # Audit missingness
     miss_feat = compute_missingness(df, imaging_cols)
