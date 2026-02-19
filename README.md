@@ -1,6 +1,8 @@
 # Robust Multimodal Fusion for Parkinson’s Diagnosis (PPMI)
 
-This repository provides a research codebase for Parkinson’s Disease (PD) vs. Healthy Control (HC) classification, focusing on robustness under missing-modality conditions. It supports synthetic data prototyping and real PPMI data integration.
+This repository provides a research codebase for Parkinson’s Disease (PD) vs. Healthy Control (HC) classification, focusing on robustness under missing-modality conditions. It supports synthetic data prototyping and real PPMI data integration. 
+
+DOI: https://doi.org/10.5281/zenodo.18705256
 
 ## Quickstart (Synthetic Data)
 
